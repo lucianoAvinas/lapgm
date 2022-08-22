@@ -27,8 +27,9 @@ def set_compute(assign_bool: bool):
         _USE_GPU = False
 
 
-def compute_bias_field(I_log: Array[float, ('M', 'N')], params: ParameterEstimate, bias_tol: float, 
-                       max_iters: int, random_seed: int, print_tols: bool) -> ParameterEstimate:
+def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
+                       params: ParameterEstimate, bias_tol: float, max_iters: int, 
+                       random_seed: int, print_tols: bool) -> ParameterEstimate:
     """Computes bias field through maximum a poseriori estimation with EM-like updates.
 
         Updates are done through a randomly permuted block cyclic ascent. All spatial
@@ -55,7 +56,7 @@ def compute_bias_field(I_log: Array[float, ('M', 'N')], params: ParameterEstimat
     random.seed(random_seed)
     while params.Bdiff > bias_tol and t < max_iters:
         for ind in func_inds:
-            step_funcs[ind](I_log, params)
+            step_funcs[ind](I_log, L, params)
 
         if print_tols:
             print(f'iter: {t}, Bdiff: {params.Bdiff}')
@@ -70,7 +71,8 @@ def compute_bias_field(I_log: Array[float, ('M', 'N')], params: ParameterEstimat
     return params
 
 
-def e_step(I_log: Array[float, ('M', 'N')], params: ParameterEstimate) -> None:
+def e_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
+           params: ParameterEstimate) -> None:
     """Expectation step. Updates posterior class probabilies 'w'.
 
     Args:
@@ -94,7 +96,8 @@ def e_step(I_log: Array[float, ('M', 'N')], params: ParameterEstimate) -> None:
     params.save('w', w)
 
 
-def gauss_step(I_log: Array[float, ('M', 'N')], params: ParameterEstimate) -> None:
+def gauss_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
+               params: ParameterEstimate) -> None:
     """Gaussian step. Updates gaussian parameters 'pi', 'mu', and 'Sigma'.
 
     Args:
@@ -125,7 +128,8 @@ def gauss_step(I_log: Array[float, ('M', 'N')], params: ParameterEstimate) -> No
     params.save('Sigma', Sigma)
 
 
-def bias_step(I_log: Array[float, ('M', 'N')], params: ParameterEstimate) -> None:
+def bias_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
+              params: ParameterEstimate) -> None:
     """Bias step. Updates the bias field 'B' and optionally the regularization 'tau'.
 
     Args:
@@ -140,7 +144,6 @@ def bias_step(I_log: Array[float, ('M', 'N')], params: ParameterEstimate) -> Non
     K = params.n_classes
 
     w = params.w
-    L = params.L
     ones_vec = ap.ones(M)
 
     B_sum = ap.zeros((N,))

@@ -46,29 +46,27 @@ class ParameterEstimate:
         Bdiff (float), default=np.inf: Relative difference between the last bias field
             estimates.
     """
-    def __new__(cls, param_obj, image, init_settings, solver_settings, save_settings):
-        if isinstance(param_obj, cls):
-            obj = param_obj
+    def __new__(cls, params_obj, image, log_image, init_settings, solver_settings, save_settings):
+        if isinstance(params_obj, cls):
+            obj = params_obj
         else:
             obj = object.__new__(cls)
-            obj.initialize_parameters(image, init_settings)
+            obj.initialize_parameters(image, log_image, init_settings)
             obj.setup_solver(None, solver_settings)
             obj.setup_saving(save_settings)
 
         return obj
 
-    def initialize_parameters(self, image, init_settings):
+    def initialize_parameters(self, image, log_image, init_settings):
         if init_settings['log_initialize']:
-            image = fill_zeros_and_log(image)
-            w = get_class_masks(image, init_settings['n_classes'], init_settings['n_init'],
+            w = get_class_masks(log_image, init_settings['n_classes'], init_settings['n_init'],
                                 init_settings['max_iters'])
 
         else:
             w = get_class_masks(image, init_settings['n_classes'], init_settings['n_init'],
                                 init_settings['max_iters'])
-            image = fill_zeros_and_log(image)
 
-        pi, mu, Sigma = init_gaussian_mixture(image, w)
+        pi, mu, Sigma = init_gaussian_mixture(log_image, w)
 
         self.w = w
         self.pi = pi
@@ -106,8 +104,41 @@ class ParameterEstimate:
         if self.store_history and attr_name not in self.large_attrs:
             getattr(self, f'{attr_name}_h').append(attr)
 
-    def apply_upscaler(self, upscaler, scale_fct, spat_dims):  # clip w and re-normalize # upscaler already has smoothness determined
-        pass # B scale fact then for loop hist, w scale fact then for loop, renormalize in outside function
+    def upscale_and_offload_parameters(self, upscaler, ds_spat, scale_fctr):
+        # number of spatial dimensions
+        dims = len(ds_spat)
+
+        # downscale full spatial shapes
+        B_ds = ds_spat
+        w_ds = [self.w.shape[0]] + list(ds_spat)
+
+        # scale factors to use when upscaling
+        B_scf = [scale_fctr]*dims
+        w_scf = [1] + [scale_fctr]*dims
+
+        # per parameter scaling functions
+        B_scaler = lambda B: self.offload(upscaler(B.reshape(B_ds), B_scf))
+        w_scaler = lambda w: self.offload(renormalize_probs(upscaler(w.reshape(w_ds), w_scf)))
+
+        # scale and offload last estimated parameters
+        self.B = B_scaler(self.B)
+        self.w = w_scaler(self.w)
+        self.pi = self.offload(self.pi)
+        self.mu = self.offload(self.mu)
+        self.Sigma = self.offload(self.Sigma)
+
+        # offload parameter histories. will not apply scaling.
+        for i in range(len(self.B_h)):
+            self.B_h[i] = self.offload(self.B_h[i])
+            self.w_h[i] = self.offload(self.w_h[i])
+            self.pi_h[i] = self.offload(self.pi_h[i])
+            self.mu_h[i] = self.offload(self.mu_h[i])
+            self.Sigma_h[i] = self.offload(self.Sigma_h[i])
+
+    def offload(self, x):
+        if _USE_GPU:
+            ap.asnumpy(x)
+        return x
 
     def get_estimate(self):
         return dict(log_B=self.B, w=self.w, pi=self.pi, log_mu=self.mu, log_Sigma=self.Sigma)
@@ -115,16 +146,19 @@ class ParameterEstimate:
     def get_history(self):
         return dict(log_B=self.B_h, logB_diff=self.Bdiff_h, w=self.w_h, pi=self.pi_h, 
                     log_mu=self.mu_h, log_Sigma=self.Sigma_h)
+        
 
+def renormalize_probs(prob_arr, class_ax=0):
+    # find smallest contributions per array index
+    arr_mins = ap.min(prob_arr, axis=class_ax)
 
-def fill_zeros_and_log(image):
-    zero_mask = (image == 0)
-    nonzero_count = reduce(mul, image.shape) - ap.sum(zero_mask)
+    # shift negative contributions up
+    prob_arr = prob_arr - arr_mins * (arr_mins < 0)
+    
+    # renormalize
+    prob_arr = prob_arr / np.sum(prob_arr, axis=class_ax)
 
-    min_val = ap.min(image[~zero_mask])
-    image[zero_mask] = ap.random.random(nonzero_count) * min_val
-
-    return ap.log(image)
+    return prob_arr
 
 
 def get_class_masks(I: Array[float, ('M', '...')], n_classes: int, n_init: int, 

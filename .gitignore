@@ -1,1 +1,4 @@
 lapgm/__pycache__
+lapgm.egg-info
+tests
+examples/__pycache__

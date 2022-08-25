@@ -6,13 +6,15 @@ from scipy.ndimage import zoom
 _USE_GPU = False
 
 from lapgm.typing_utils import Array
+from lapgm.bias_calc import compute_bias_field
 from lapgm.param_setup import ParameterEstimate
-from lapgm.laplacian_routines import prepare_wgts, hyper_ellipsoid_radius
+from lapgm.laplacian_routines import prepare_wgts, hyper_ellipsoid_radius, \
+                                     construct_dirichlet_lap, weight_laplacian
 
 
 def set_compute(assign_bool: bool):
     """Set preferred array package"""
-    global _USE_GPU, ap, zppm
+    global _USE_GPU, ap, zoom
     
     if assign_bool:
         import cupy as ap
@@ -34,74 +36,79 @@ class LapGM:
 
         self.tau = None
         self.init_settings = None
-        self.laplacian_weighting_fn = None
+        self.weight_settings = None
 
-    def specify_laplacian_weighting(self, wgt_func: Callable, axes_of_symmetry: tuple[int] = None, 
-                                    center: tuple[int] = None, semi_axes: tuple[int] = None):
-        # center and semi_axes are done using the reduced dimensions
+    def specify_cylindrical_decay(self, alpha, axes_of_symmetry: tuple[int] = (0,), 
+                                  center: tuple[int] = (0,0), semi_axes: tuple[int] = (1,1)):
+        wgt_func = lambda x: x**(-alpha)
+        self.weight_settings = dict(wgt_func=wgt_func, axes_of_symmetry=axes_of_symmetry, 
+                                    center=center, semi_axes=semi_axes)
 
-        coord_transf = hyper_ellipsoid_radius(centers, semi_axes)
-
-        self.laplacian_weighting_fn = lambda shp: prepare_wgts(shp, wgt_func, coord_transf, 
-                                                               axes_of_symmetry)
-
-    def set_hyperparameters(n_classes: int, tau: float, log_initialize: bool = True, kmeans_n_init: int = 10,
-                            kmeans_max_iters: int = 300):
-        self.n_classes = n_classes
+    def set_hyperparameters(self, n_classes: int, tau: float, log_initialize: bool = True, 
+                            kmeans_n_init: int = 5, kmeans_max_iters: int = 300):
         self.tau = tau
-        self.init_settings = dict(log_initialize=log_initialize, n_init=kmeans_n_init, 
-                                  max_iters=kmeans_max_iters)
+        self.init_settings = dict(n_classes=n_classes, log_initialize=log_initialize, 
+                                  n_init=kmeans_n_init, max_iters=kmeans_max_iters)
 
-    def estimate_parameters(self, image: Array[float, ('M', '...')], n_seqs: int, bias_tol: float = 1e-4,
-                            max_em_iters: int = 25, max_cg_iters: int = 25000, random_seed: int = 1, 
-                            print_tols: bool = False, params_obj: type[ParameterEstimate] = None, 
+    def estimate_parameters(self, image: Array[float, ('M', '...')], n_seqs: int = 1, 
+                            bias_tol: float = 1e-4, max_em_iters: int = 25, 
+                            max_cg_iters: int = 25000, random_seed: int = 1,  
+                            print_tols: bool = False, params_obj: ParameterEstimate = None, 
                             custom_wgts: Array[float, 'N'] = None):
-        # try and catch the usual overflow error
+
         # set max_em_iters to zero to get just inital_param estimate and then modify
+        # mention this in documentation of params_obj
+
+        # check if number of sequences matches first axis length
+        image = check_seq_shape(image, n_seqs)
 
         # cast to relevant array
-        image = ap.asarray(image)
-        image = check_seq_shape(image, n_seqs)
+        image = ap.asarray(image)        
 
         # dimensions of the spatial axes
         spat_shape = image.shape[1:]
 
         # downscale image
         per_seq_sc = [1] + [self.scale_fctr]*len(spat_shape)
-        image = zoom(image, per_seq_sc, order=self.scaling_smoothness, mode='nearest')
+        image = abs(zoom(image, per_seq_sc, order=self.scaling_smoothness, mode='nearest'))        
 
-        # flatten spatial axes
+        # flatten spatial axes and log
         spat_ds_shape = image.shape[1:]
-        image = image.reshape(n_seqs, -1)
-        log_image = fill_zeros_and_log(image)
+        log_image = fill_zeros_and_log(image).reshape(n_seqs, -1)
 
-        init_params = dict() if init_params is None else init_params
+        # construct initial parameter estimate
         params = ParameterEstimate(params_obj, image, log_image, self.init_settings, 
                                    dict(maxiter=max_cg_iters), self.save_settings)
 
+        # apply laplacian weighting routine
         if custom_wgts is not None:
             wgts = ap.asarray(custom_wgts)
-        else:
-            wgts = self.laplacian_weighting_fn(spat_ds_shape)
 
-        # weight Laplacian and scale by tau
+        elif self.weight_settings is not None:
+            coord_transf = hyper_ellipsoid_radius(self.weight_settings['center'], 
+                                                  self.weight_settings['semi_axes'])
+            wgts =  prepare_wgts(spat_ds_shape, self.weight_settings['wgt_func'], 
+                                 coord_transf, self.weight_settings['axes_of_symmetry'])
+        else:
+            # uniform multiplicative weight if no weight is provided
+            wgts = ap.ones(log_image.shape[1])
+
+        # construct weighted Laplacian and scale by tau
         L = weight_laplacian(construct_dirichlet_lap(spat_ds_shape, True), wgts) / self.tau
 
-        # estimate parameters
-        params = compute_bias_field(log_image, L, params, bias_tol, max_em_iters, random_seed, 
-                                    print_tols)
+        # calculate parameter estimates
+        params = compute_bias_field(log_image, L, params, bias_tol, max_em_iters, 
+                                    random_seed, print_tols)
         
-        # define upscaler
-        upscaler = lambda img_ds, scale_fctrs: scale_and_pad(img_ds, spat_shape, scale_fctrs, 
-                                                             self.scaling_smoothness)
-
-        
-        params.apply_upscaler_and_offload(upscaler, spat_ds_shape, self.scale_fctr)
+        # define upscaler and apply
+        upscaler = lambda img_ds, targ_shp, sc_lst: scale_and_pad(img_ds, targ_shp, sc_lst, 
+                                                                  self.scaling_smoothness)
+        params.upscale_parameters(upscaler, spat_shape, 1/self.scale_fctr)
 
         return params
 
 
-def check_seq_shape(image, n_seqs):
+def check_seq_shape(image: Array[Any, ('M', '...')], n_seqs: int):
     if image.shape[0] != n_seqs:
         if n_seqs == 1:
             image = image[None]
@@ -111,12 +118,12 @@ def check_seq_shape(image, n_seqs):
     return image
 
 
-def fill_zeros_and_log(image):
+def fill_zeros_and_log(image: Array[Any, ('...')]):
     zero_mask = (image == 0)
-    nonzero_count = reduce(mul, image.shape) - ap.sum(zero_mask)
 
-    min_val = ap.min(image[~zero_mask])
-    image[zero_mask] = ap.random.random(nonzero_count) * min_val
+    min_val = ap.min(image[~zero_mask])//2
+    zero_cnt = ap.sum(zero_mask).item()
+    image[zero_mask] = ap.random.random(zero_cnt) * min_val
 
     return ap.log(image)
 
@@ -130,7 +137,7 @@ def scale_and_pad(scale_img: Array[float, ('...')], orig_dims: tuple[int],
         smooth_order: order of smoothness to interpolate with
     """
         
-    img = zoom(scale_img, scale_fctrs, order=smooth_order, mode='nearest')
+    img = abs(zoom(scale_img, scale_fctrs, order=smooth_order, mode='nearest'))
 
     # calculate dimension offset between upsampled image and original image
     dim_diff = tuple(o-n for o,n in zip(orig_dims, img.shape))

@@ -1,7 +1,7 @@
 import random 
 
 from lapgm.typing_utils import Array
-from lapgm.param_utils import ParameterEstimate
+from lapgm.param_setup import ParameterEstimate
 
 # CPU specification on default
 import numpy as ap
@@ -17,7 +17,7 @@ def set_compute(assign_bool: bool):
     if assign_bool:
         import cupy as ap
         import cupyx.scipy.sparse as sp
-        from cupyx_multivariate_normal import multivariate_normal as multi_normal
+        from lapgm.cupyx_mvn import multivariate_normal as multi_normal
         _USE_GPU = True
 
     else:
@@ -29,7 +29,7 @@ def set_compute(assign_bool: bool):
 
 def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
                        params: ParameterEstimate, bias_tol: float, max_iters: int, 
-                       random_seed: int, print_tols: bool) -> ParameterEstimate:
+                       random_seed: int, print_tols: bool):
     """Computes bias field through maximum a poseriori estimation with EM-like updates.
 
         Updates are done through a randomly permuted block cyclic ascent. All spatial
@@ -50,13 +50,14 @@ def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N
             Final parameter estimate with parameter history.
     """
     func_inds = list(range(3))
-    phases = [e_step, gauss_step, bias_step]
+    step_fns = [e_step, gauss_step, bias_step]
 
+    t = 0
     last_ind = 2
     random.seed(random_seed)
     while params.Bdiff > bias_tol and t < max_iters:
         for ind in func_inds:
-            step_funcs[ind](I_log, L, params)
+            step_fns[ind](I_log, L, params)
 
         if print_tols:
             print(f'iter: {t}, Bdiff: {params.Bdiff}')
@@ -72,7 +73,7 @@ def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N
 
 
 def e_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
-           params: ParameterEstimate) -> None:
+           params: ParameterEstimate):
     """Expectation step. Updates posterior class probabilies 'w'.
 
     Args:
@@ -83,7 +84,7 @@ def e_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
     Returns:
         None
     """
-    N = I.shape[1]
+    N = I_log.shape[1]
     K = params.n_classes
 
     w = ap.zeros((K, N))
@@ -97,7 +98,7 @@ def e_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
 
 
 def gauss_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
-               params: ParameterEstimate) -> None:
+               params: ParameterEstimate):
     """Gaussian step. Updates gaussian parameters 'pi', 'mu', and 'Sigma'.
 
     Args:
@@ -108,7 +109,7 @@ def gauss_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
     Returns:
         None
     """
-    N = I.shape[1]
+    N = I_log.shape[1]
     K = params.n_classes
 
     w_sum = params.w.sum(axis=1)
@@ -129,7 +130,7 @@ def gauss_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
 
 
 def bias_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
-              params: ParameterEstimate) -> None:
+              params: ParameterEstimate):
     """Bias step. Updates the bias field 'B' and optionally the regularization 'tau'.
 
     Args:
@@ -140,7 +141,7 @@ def bias_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
     Returns:
         None
     """
-    M,N = I.shape
+    M,N = I_log.shape
     K = params.n_classes
 
     w = params.w
@@ -160,7 +161,7 @@ def bias_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
 
     B_prev = params.B
     prev_norm = ap.linalg.norm(B_prev)
-    Bdiff = ap.inf if prev_norm  == 0 else ap.linalg.norm(Bhat - B_prev)/prev_norm 
+    Bdiff = ap.inf if prev_norm  == 0 else ap.linalg.norm(Bhat - B_prev)/prev_norm
 
     params.save('B', Bhat)
     params.save('Bdiff', Bdiff)

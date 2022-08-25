@@ -2,14 +2,16 @@ import cupy as cp
 import numpy as np
 import scipy.linalg
 
+from lapgm.typing_utils import Array
 
 # Original scipy.stats._multivariate.py author: Joris Vankerschaver 2013
 # Rewritten using cupy functions
 
+
 class multivariate_normal:
-    # scipy.stats multivariate normal probability density function written with cupy
     @staticmethod
-    def pdf(x, mean, cov, allow_singular=False):
+    def pdf(x: Array[float, ('M','N')], mean: Array[float, ('M','K')],
+            cov: Array[float, ('M','K', 'K')], allow_singular: bool = False):
         dim = mean.shape[0]
 
         s, u = scipy.linalg.eigh(cp.asnumpy(cov), lower=True, check_finite=True)

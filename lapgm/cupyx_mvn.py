@@ -2,7 +2,7 @@ import cupy as cp
 import numpy as np
 import scipy.linalg
 
-from lapgm.typing_utils import Array
+from .typing_details import Array
 
 # Original scipy.stats._multivariate.py author: Joris Vankerschaver 2013
 # Rewritten using cupy functions
@@ -10,8 +10,8 @@ from lapgm.typing_utils import Array
 
 class multivariate_normal:
     @staticmethod
-    def pdf(x: Array[float, ('M','N')], mean: Array[float, ('M','K')],
-            cov: Array[float, ('M','K', 'K')], allow_singular: bool = False):
+    def pdf(x: Array[float, ('M', 'N')], mean: Array[float, ('M', 'K')],
+            cov: Array[float, ('M', 'K', 'K')], allow_singular: bool = False):
         dim = mean.shape[0]
 
         s, u = scipy.linalg.eigh(cp.asnumpy(cov), lower=True, check_finite=True)

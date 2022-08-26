@@ -1,30 +1,14 @@
-from typing import Callable
+from typing import Callable, Any
 
-# CPU specification on default
-import numpy as ap
-from scipy.ndimage import zoom
-_USE_GPU = False
+from .typing_details import Array
+from .bias_calc import compute_bias_field
+from .param_setup import ParameterEstimate
+from .laplacian_routines import prepare_wgts, hyper_ellipsoid_radius, \
+                                construct_dirichlet_lap, weight_laplacian
 
-from lapgm.typing_utils import Array
-from lapgm.bias_calc import compute_bias_field
-from lapgm.param_setup import ParameterEstimate
-from lapgm.laplacian_routines import prepare_wgts, hyper_ellipsoid_radius, \
-                                     construct_dirichlet_lap, weight_laplacian
-
-
-def set_compute(assign_bool: bool):
-    """Set preferred array package"""
-    global _USE_GPU, ap, zoom
-    
-    if assign_bool:
-        import cupy as ap
-        from cupyx.scipy.ndimage import zoom
-        _USE_GPU = True
-
-    else:
-        import numpy as ap
-        from scipy.ndimage import zoom
-        _USE_GPU = False
+### Typing details to be replaced with real packages at runtime ###
+from .typing_details import ArrayPackage as ap
+from .typing_details import RuntimeFunc as zoom
 
 
 class LapGM:

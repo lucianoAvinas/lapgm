@@ -1,31 +1,62 @@
 import numpy as np
 from typing import Callable
+from types import ModuleType
 
-from lapgm.config import _CUPY_PATH
-from lapgm.typing_utils import Array
-from lapgm.param_setup import ParameterEstimate
-from lapgm.lapgm_estim import LapGM, check_seq_shape
-from lapgm.view_utils import view_center_slices, view_class_map, \
-                             view_distributions
+# for __init__ package use
+from lapgm import config
+from lapgm import bias_calc
+from lapgm import param_setup
+from lapgm import lapgm_estim
+from lapgm import laplacian_routines
 
-from lapgm.lapgm_estim import set_compute as le_setcomp
-from lapgm.bias_calc import set_compute as bc_setcomp
-from lapgm.param_setup import set_compute as ps_setcomp
-from lapgm.laplacian_routines import set_compute as lr_setcomp
+# function shortcuts
+from .typing_details import Array
+from .param_setup import ParameterEstimate
+from .lapgm_estim import LapGM, check_seq_shape
+from .view_utils import view_center_slices, view_class_map, view_distributions
+
+
+def module_set(mod: ModuleType, attr_nms: tuple[str], options: dict[str, ModuleType]):
+    """Helper function for quick attribute assignment on submodules"""
+    for attr_nm in attr_nms:
+        setattr(mod, attr_nm, options[attr_nm])
 
 
 def use_gpu(assign_bool: bool):
-    """Propagate GPU settings to relevant modules"""
-    if config._CUPY_PATH is None:
+    """Propagate GPU or CPU settings to lapgm submodules"""
+    if assign_bool:
+        if config._CUPY_PATH is None:
             raise ModuleNotFoundError('CuPy array package not found')
 
-    le_setcomp(assign_bool)
-    bc_setcomp(assign_bool)
-    ps_setcomp(assign_bool)
-    lr_setcomp(assign_bool)
+        # cupy related packages
+        import cupy as ap
+        import cupyx.scipy.sparse as sp
+        import cupyx.scipy.sparse.linalg as spl
+        from cupyx.scipy.ndimage import zoom as zoom
+        from .cupyx_mvn import multivariate_normal as multi_normal
+
+    else:
+        # numpy related packages
+        import numpy as ap
+        import scipy.sparse as sp
+        import scipy.sparse.linalg as spl
+        from scipy.ndimage import zoom as zoom
+        from scipy.stats import multivariate_normal as multi_normal
+
+    options = dict(ap=ap, sp=sp, spl=spl, zoom=zoom, multi_normal=multi_normal)
+
+    # dynamically set import for submodules
+    module_set(bias_calc, ('ap', 'sp', 'multi_normal'), options)
+    module_set(param_setup, ('ap', 'spl'), options)
+    module_set(lapgm_estim, ('ap', 'zoom'), options)
+    module_set(laplacian_routines, ('ap', 'sp'), options)
 
 
-def debias(image: Array[float, ('M', '...')], params: type[ParameterEstimate]):
+### Initialize preferred array package to Numpy CPU ###
+use_gpu(False)
+
+
+def debias(image: Array[float, ('M', '...')], params: ParameterEstimate):
     nonzero_mask = (image > 0)
     deb_image = np.zeros(image.shape)
 
@@ -58,12 +89,15 @@ def normalize(image: Array[float, ('M', '...')], n_seqs: int,
     return norm_image
 
 
-def max_norm_fn(image: Array[float, ('M', '...')], params: ParameterEstimate, seq_id: int = None):
-    mu = params.mu
+def max_norm_fn(image: Array[float, ('M', '...')], params: ParameterEstimate, 
+                seq_id: int = None):
 
+    mu = params.mu
     if seq_id is None:
         mu_mx = np.exp(np.max(mu, axis=1))
-        sc = (mu_mx @ mu_mx) / np.sum(mu_mx)  # Least-squares estimate on [TARGT,...,TARGT]
+
+        # Least-squares estimate on [TARGT,...,TARGT]
+        sc = (mu_mx @ mu_mx) / np.sum(mu_mx)
     else:
         sc = np.exp(np.max(mu[:,seq_id]))
 

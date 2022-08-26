@@ -2,10 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from typing import Any
-from collections.abc import Iterable
-from lapgm.typing_utils import Array
 from scipy.stats import gaussian_kde
 from matplotlib.patches import Patch
+
+from .typing_details import Array
 
 SAVE_DPI = 300
 
@@ -41,7 +41,7 @@ def save_or_show(save_path: str):
 
 
 def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Array[bool, ('...')], 
-                       color_scale: bool = False, title_names: Iterable[str] = None, 
+                       color_scale: bool = False, title_names: list[str] = None, 
                        full_save_path: str = None):
     """
         image_volumes: collection of 3 axes arrays

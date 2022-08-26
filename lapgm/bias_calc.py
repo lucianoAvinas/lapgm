@@ -1,59 +1,43 @@
 import random 
 
-from lapgm.typing_utils import Array
-from lapgm.param_setup import ParameterEstimate
+from .typing_details import Array
+from .param_setup import ParameterEstimate
 
-# CPU specification on default
-import numpy as ap
-import scipy.sparse as sp
-from scipy.stats import multivariate_normal as multi_normal
-_USE_GPU = False
-
-
-def set_compute(assign_bool: bool):
-    """Set preferred array package"""
-    global _USE_GPU, ap, sp, multi_normal
-    
-    if assign_bool:
-        import cupy as ap
-        import cupyx.scipy.sparse as sp
-        from lapgm.cupyx_mvn import multivariate_normal as multi_normal
-        _USE_GPU = True
-
-    else:
-        import numpy as ap
-        import scipy.sparse as sp
-        from scipy.stats import multivariate_normal as multi_normal
-        _USE_GPU = False
+### Typing details to be replaced with real packages at runtime ###
+from .typing_details import ArrayPackage as ap
+from .typing_details import SparsePackage as sp
+from .typing_details import RuntimeFunc as multi_normal
 
 
 def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
                        params: ParameterEstimate, bias_tol: float, max_iters: int, 
                        random_seed: int, print_tols: bool):
-    """Computes bias field through maximum a poseriori estimation with EM-like updates.
+    """Computes relevant LapGM parameters through a MAP probability estimate.
 
-        Updates are done through a randomly permuted block cyclic ascent. All spatial
-        arrays are flattened to vector form.
+    Block updates are in a randomly permuted order. Major dimensions are 'M' sequences,
+    'K' classes, and 'N' spatial elements. Spatial elements may belong to a general
+    d-dimensional grid but are flattened during optimization.
 
     Args:
-        I_log (Array[float, ('M', 'N')]): Multichannel log-image with 'M' channels and 'N'
-            voxels in flattened dimenions.
-        params (ParameterEstimate): Contains initial parameter estimate and parameter history.
-        bias_tol (float): A tolerance value on the between iteration difference of bias fields
-            estimates. Computation is stopped for difference less than tolerance.
-        max_iters (int): Maximum number of complete EM steps to do.
-        random_seed (int): Value to seed steps in the random permuted block ascent.
-        print_tols (bool): Whether to print bias field relative differences between updates.
+        I_log: 'M' channel log-image with 'N' voxels flattened in the last axis.
+        L: Weighted Laplacian matrix corresponding to the spatial structure of the 'N'
+            nodes.
+        params: Container for parameter estimate and history.
+        bias_tol: Relative tolerance value to stop computation if subsequent bias field
+            estimates are close in value.
+        max_iters: Maximum number of MAP optimization steps to do.
+        random_seed: Sets the seed for the order of the randomly permuted block updates.
+        print_tols: Determines whether relative differences for subsequent bias field 
+            estimates should be printed.
 
-    Returns:
-        ParameterEstimate:
-            Final parameter estimate with parameter history.
+    Returns final parameter estimate with parameter history.
     """
-    func_inds = list(range(3))
     step_fns = [e_step, gauss_step, bias_step]
 
+    func_inds = list(range(len(step_fns)))
+    last_ind = max(func_inds)
+
     t = 0
-    last_ind = 2
     random.seed(random_seed)
     while params.Bdiff > bias_tol and t < max_iters:
         for ind in func_inds:
@@ -62,7 +46,10 @@ def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N
         if print_tols:
             print(f'iter: {t}, Bdiff: {params.Bdiff}')
 
+        # reshuffle step fns
         random.shuffle(func_inds)
+
+        # assure next starting step is different
         if func_inds[0] == last_ind:
             func_inds = func_inds[::-1]
         last_ind = func_inds[-1]
@@ -74,15 +61,13 @@ def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N
 
 def e_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
            params: ParameterEstimate):
-    """Expectation step. Updates posterior class probabilies 'w'.
+    """Update step for posterior class probabilies 'w'.
 
     Args:
-        I_log (Array[float, ('M', 'N')]): Multichannel log-image with 'M' channels and 'N'
-            voxels in flattened dimenions.
-        params (ParameterEstimate): Contains initial parameter estimate and parameter history.
-
-    Returns:
-        None
+        I_log: 'M' channel log-image with 'N' voxels flattened in the last axis.
+        L: Weighted Laplacian matrix corresponding to the spatial structure of the 'N'
+            nodes.
+        params: Container for parameter estimate and history.
     """
     N = I_log.shape[1]
     K = params.n_classes
@@ -99,15 +84,13 @@ def e_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
 
 def gauss_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
                params: ParameterEstimate):
-    """Gaussian step. Updates gaussian parameters 'pi', 'mu', and 'Sigma'.
+    """Update step for Gaussian parameters 'pi', 'mu', and 'Sigma'.
 
     Args:
-        I_log (Array[float, ('M', 'N')]): Multichannel log-image with 'M' channels and 'N'
-            voxels in flattened dimenions.
-        params (ParameterEstimate): Contains initial parameter estimate and parameter history.
-
-    Returns:
-        None
+        I_log: 'M' channel log-image with 'N' voxels flattened in the last axis.
+        L: Weighted Laplacian matrix corresponding to the spatial structure of the 'N'
+            nodes.
+        params: Container for parameter estimate and history.
     """
     N = I_log.shape[1]
     K = params.n_classes
@@ -131,15 +114,13 @@ def gauss_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
 
 def bias_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')], 
               params: ParameterEstimate):
-    """Bias step. Updates the bias field 'B' and optionally the regularization 'tau'.
+    """Update step for log bias 'B'.
 
     Args:
-        I_log (Array[float, ('M', 'N')]): Multichannel log-image with 'M' channels and 'N'
-            voxels in flattened dimenions.
-        params (ParameterEstimate): Contains initial parameter estimate and parameter history.
-
-    Returns:
-        None
+        I_log: 'M' channel log-image with 'N' voxels flattened in the last axis.
+        L: Weighted Laplacian matrix corresponding to the spatial structure of the 'N'
+            nodes.
+        params: Container for parameter estimate and history.
     """
     M,N = I_log.shape
     K = params.n_classes

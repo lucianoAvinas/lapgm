@@ -2,27 +2,11 @@ from operator import mul
 from functools import reduce
 
 from typing import Callable, Any
-from lapgm.typing_utils import Array
+from .typing_details import Array
 
-# CPU specification on default
-import numpy as ap
-import scipy.sparse as sp
-_USE_GPU = False
-
-
-def set_compute(assign_bool: bool):
-    """Set preferred array package"""
-    global _USE_GPU, ap, sp
-    
-    if assign_bool:
-        import cupy as ap
-        import cupyx.scipy.sparse as sp
-        _USE_GPU = True
-
-    else:
-        import numpy as ap
-        import scipy.sparse as sp
-        _USE_GPU = False
+### Typing details to be replaced with real packages at runtime ###
+from .typing_details import ArrayPackage as ap
+from .typing_details import SparsePackage as sp
 
 
 def construct_dirichlet_lap(bounds: tuple[int], upper_only: bool = False):
@@ -88,7 +72,7 @@ def prepare_wgts(bounds: tuple, wgt_func: Callable, coord_transf: Callable,
     if axes_of_symmetry is None:
         axes_of_symmetry = tuple()
     else:
-        # duck type into tuple
+        # duck type to tuple. (iterable is accepted as well)
         try:
             axes_of_symmetry[0]
         except TypeError:

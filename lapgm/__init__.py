@@ -64,7 +64,7 @@ def use_gpu(assign_bool: bool):
         pkg_suff = 'cpu'
 
     # update compute metadata on param_setup for parameter off-loading
-    param_setup._ON_GPU = bool
+    param_setup._ON_GPU = assign_bool
 
     # get module object
     module_self = sys.modules[__name__]

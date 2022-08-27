@@ -12,6 +12,16 @@ class multivariate_normal:
     @staticmethod
     def pdf(x: Array[float, ('M', 'N')], mean: Array[float, ('M', 'K')],
             cov: Array[float, ('M', 'K', 'K')], allow_singular: bool = False):
+        """Calculates probability density value for a specified multivariate normal.
+
+        Args:
+            x: Multivariate values to calculate probability density on.
+            mean: Mean of multivariate normal.
+            cov: Covariance of multivariate normal.
+            allow_singular: Throws exception if true and cov singular.
+
+        Returns array of length 'N' of probability density values.
+        """
         dim = mean.shape[0]
 
         s, u = scipy.linalg.eigh(cp.asnumpy(cov), lower=True, check_finite=True)

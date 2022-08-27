@@ -85,7 +85,7 @@ class LapGM:
 
         Args:
             image: Multichannel image with variable spatial dimensions.
-            n_seqs: Specifies the number of sequences 'M' in multichannel image.
+            n_seqs: Specifies number of sequences 'M' in multichannel image.
             bias_tol: Relative tolerance to stop on if subsequent bias estimates are 
                 close in value.
             max_em_iters: Maximum number of MAP optimization steps to do.

@@ -51,7 +51,16 @@ def construct_dirichlet_lap(bounds: tuple[int], upper_only: bool = False):
 
 
 def weight_laplacian(L_upper: Array[float, ('N', 'N')], wgts: Array[float, 'N']):
-    """# talk about vertex weighting
+    """Symmetrize vertex weights to edge weights for Laplacian structure L.
+
+    Symmetrization is dependent on how Laplacian orders different spatial axis.
+    Uniform weighting will produced (scaled) Dirichlet Laplacian.
+
+    Args:
+        L_upper: Upper triangular discrete Laplacian.
+        wgts: Weighting per voxels.
+
+    Returns zero-boundary condition Laplacian with custom edge-weights.
     """
     # apply voxel weighting as an edge weight
     L_upper = L_upper.multiply(wgts)
@@ -66,17 +75,25 @@ def weight_laplacian(L_upper: Array[float, ('N', 'N')], wgts: Array[float, 'N'])
 def prepare_wgts(bounds: tuple, wgt_func: Callable, coord_transf: Callable, 
                  axes_of_symmetry: tuple[int] = None, zero_one_scale: bool = True, 
                  fill_zeros: bool = True):
+    """Generate Laplacian valid weights from weighting and coordinate functions.
+
+    Coordinates are generated sparsely for non-symmetric regions (axes).
+
+    Args:
+        bounds: Spatial dimensions of Laplacian.
+        wgt_func: Weighting function for vertex weighting.
+        coord_trasnf: Converts and transforms sparse coordinates to dense coordinates.
+        axes_of_symmetry: Axes which do not affect weighting values.
+        zero_one_scale: [0,1] normalizes weights for Laplacian.
+        fill_zeros: Fills zeros with minimum non-zero value found in weights.
+
+    Returns array of weights to use in weighting Laplacian.
+    """
+    if axes_of_symmetry is None:
+        # accept None to stand in for empty tuple
+        axes_of_symmetry = tuple()
 
     # subset bounds according to axis symmetries
-    if axes_of_symmetry is None:
-        axes_of_symmetry = tuple()
-    else:
-        # duck type to tuple. (iterable is accepted as well)
-        try:
-            axes_of_symmetry[0]
-        except TypeError:
-            axes_of_symmetry = tuple(axes_of_symmetry)
-
     bounds_subset = tuple(n_i for i,n_i in enumerate(bounds) if i not in axes_of_symmetry)
 
     sparse_coords = []
@@ -109,24 +126,41 @@ def prepare_wgts(bounds: tuple, wgt_func: Callable, coord_transf: Callable,
 
 
 def inplace_min_fill(x: Array[float, ('...')]):
+    """Fill zeros with smallest non-zero value"""
     x[x == 0] = ap.min(x[x != 0])
 
 
 def fill_on_none(x: Any, val: Any, sz: int):
+    """If x is none return filled list with element val."""
     if x is None:
         x = [val]*sz
     return x
 
 
-def hyper_ellipsoid_radius(centers: tuple[int], semi_axes: tuple[int], 
+def hyper_ellipsoid_radius(center: tuple[int], semi_axes: tuple[int], 
                            smoothout_origin: bool = True):
-    def radial_calc(coords: list[Array[Any, ('...')]]):
-        # coords are sparse
+    """Generates function to calculate hyperellipsoid radius.
 
+    Args:
+        center: Center of hyperellipsoid.
+        semi_axes: Semi-major axes of hyperellipsoid.
+        smoothout_origin: Fills zero with min value on true.
+
+    Returns function to calculate radius for specified hyperellipse.
+    """
+    def radial_calc(coords: list[Array[Any, ('...')]]):
+        """Level set calculator of hyperellipse.
+
+        Args:
+            coords: List of coordinates used per axis. Coordinates come
+                in sparse and are made dense through broadcasting.
+
+        Returns radial values for each dense coordinate.
+        """
         d = len(coords)
 
         # intialize defaults to spherical with 0 origin
-        co_cent = fill_on_none(centers, 0, d)
+        co_cent = fill_on_none(center, 0, d)
         co_semi = fill_on_none(semi_axes, 1, d)
 
         sc_coords = [(coords[i] - co_cent[i])**2/co_semi[i] for i in range(d)]

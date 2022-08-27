@@ -6,6 +6,7 @@ from typing import Generic, TypeVar, Any, NewType, Callable
 Shape = TypeVar('Shape')
 
 class Array(npt.NDArray[Any], Generic[Shape]):
+    """For documentation: takes in datatype and array dimension shape."""
     pass
 
 

@@ -1,19 +1,45 @@
+import sys
+import warnings
 import numpy as np
 from typing import Callable
 from types import ModuleType
-
-# for __init__ package use
-from lapgm import config
-from lapgm import bias_calc
-from lapgm import param_setup
-from lapgm import lapgm_estim
-from lapgm import laplacian_routines
 
 # function shortcuts
 from .typing_details import Array
 from .param_setup import ParameterEstimate
 from .lapgm_estim import LapGM, check_seq_shape
 from .view_utils import view_center_slices, view_class_map, view_distributions
+
+# for __init__ array package assignment
+from lapgm import bias_calc
+from lapgm import param_setup
+from lapgm import lapgm_estim
+from lapgm import laplacian_routines
+
+## CPU array packages
+import numpy as ap_cpu
+import scipy.sparse as sp_cpu
+import scipy.sparse.linalg as spl_cpu
+from scipy.ndimage import zoom as zoom_cpu
+from scipy.stats import multivariate_normal as multi_normal_cpu
+
+## GPU array packages
+try:
+    import cupy as ap_gpu
+    import cupyx.scipy.sparse as sp_gpu
+    import cupyx.scipy.sparse.linalg as spl_gpu
+    from cupyx.scipy.ndimage import zoom as zoom_gpu
+    from .cupyx_mvn import multivariate_normal as multi_normal_gpu
+    _USE_GPU = True
+
+except ModuleNotFoundError as err:
+    warnings.warn(f'Certain GPU array packages could not be found. ' + \
+                   'lapgm.use_gpu will be restricted to cpu arrays only.')
+    ERR = err
+    _USE_GPU = False
+
+# Naming conventions for CPU/GPU array packages
+ARRAY_PKGS = ('ap', 'sp', 'spl', 'zoom', 'multi_normal')
 
 
 def module_set(mod: ModuleType, attr_nms: tuple[str], options: dict[str, ModuleType]):
@@ -23,27 +49,23 @@ def module_set(mod: ModuleType, attr_nms: tuple[str], options: dict[str, ModuleT
 
 
 def use_gpu(assign_bool: bool):
-    """Propagate GPU or CPU settings to lapgm submodules"""
+    """Propagate GPU or CPU settings to lapgm submodules.
+
+    Raises ModuleNotFoundError if user sets compute to GPU while missing relevant packages.
+    """
     if assign_bool:
-        if config._CUPY_PATH is None:
-            raise ModuleNotFoundError('CuPy array package not found')
-
-        # cupy related packages
-        import cupy as ap
-        import cupyx.scipy.sparse as sp
-        import cupyx.scipy.sparse.linalg as spl
-        from cupyx.scipy.ndimage import zoom as zoom
-        from .cupyx_mvn import multivariate_normal as multi_normal
-
+        if _USE_GPU:
+            pkg_suff = 'gpu'
+        else:
+            raise ModuleNotFoundError(ERR)
     else:
-        # numpy related packages
-        import numpy as ap
-        import scipy.sparse as sp
-        import scipy.sparse.linalg as spl
-        from scipy.ndimage import zoom as zoom
-        from scipy.stats import multivariate_normal as multi_normal
+        pkg_suff = 'cpu'
 
-    options = dict(ap=ap, sp=sp, spl=spl, zoom=zoom, multi_normal=multi_normal)
+    # get module object
+    module_self = sys.modules[__name__]
+
+    # link array package names to cpu/gpu packages
+    options = {pkg_nm:getattr(module_self, f'{pkg_nm}_{pkg_suff}') for pkg_nm in ARRAY_PKGS}
 
     # dynamically set import for submodules
     module_set(bias_calc, ('ap', 'sp', 'multi_normal'), options)
@@ -52,11 +74,21 @@ def use_gpu(assign_bool: bool):
     module_set(laplacian_routines, ('ap', 'sp'), options)
 
 
-### Initialize preferred array package to Numpy CPU ###
+### Initialize preferred array package to CPU ###
 use_gpu(False)
 
 
 def debias(image: Array[float, ('M', '...')], params: ParameterEstimate):
+    """Debias image using previously computed LapGM parameters.
+
+    Only non-negative intensity values will be considered for debiasing.
+
+    Args:
+        image: 'M' channel image with variable spatial dimensions.
+        params: Previously computed LapGM parameters.
+
+    Returns debiased image.
+    """
     nonzero_mask = (image > 0)
     deb_image = np.zeros(image.shape)
 
@@ -70,7 +102,23 @@ def debias(image: Array[float, ('M', '...')], params: ParameterEstimate):
 def normalize(image: Array[float, ('M', '...')], n_seqs: int, 
               params: ParameterEstimate, target_intensity: float = 1000., 
               norm_fn: Callable = None,  per_seq_norm: bool = True):
+    """Normalizes image intensity values with LapGM parameter information.
 
+    Normalization procedure depends on chosen norm_fn. By default this
+    will be a max normalization using the largest computed mean.
+
+    Args:
+        image: 'M' channel image with variable spatial dimensions.
+        n_seqs: Specifies number of sequences 'M' in multichannel image.
+        params: Previously computed LapGM parameters.
+        target_intensity: Scale to target when normalizing image intensities.
+        norm_fn: Function to use when normalizing image. Takes in: 
+            multichannel + spatial Array, ParameterEstimate, and an optional
+            sequence specifier index.
+        per_seq_norm: Normalizes different sequences independently if true.
+
+    Returns normalized image with target scaling applied.
+    """
     image = check_seq_shape(image, n_seqs)
 
     if norm_fn is None:
@@ -91,12 +139,22 @@ def normalize(image: Array[float, ('M', '...')], n_seqs: int,
 
 def max_norm_fn(image: Array[float, ('M', '...')], params: ParameterEstimate, 
                 seq_id: int = None):
+    """Normalizes image by taken largest parameter mean and dividing through.
 
+    For multichannel concurrent normalization, the largest mean of each
+    channel is taken and balanced through a least squares procedure.
+
+    Args:
+        image: 'M' channel image with variable spatial dimensions.
+        params: Previously computed LapGM parameters.
+        seq_id: Specifies which image sequence to normalize against. If none,
+            multichannel normalization routine will be used.
+    """
     mu = params.mu
     if seq_id is None:
         mu_mx = np.exp(np.max(mu, axis=1))
 
-        # Least-squares estimate on [TARGT,...,TARGT]
+        # Least-squares estimate on TARGT * [1,...,1]
         sc = (mu_mx @ mu_mx) / np.sum(mu_mx)
     else:
         sc = np.exp(np.max(mu[:,seq_id]))

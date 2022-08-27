@@ -10,34 +10,27 @@ from .typing_details import SparseLinalgPackage as spl
 
 
 class ParameterEstimate:
-    """Class to hold and transfer computed parameters.
+    """Stores and transfers computed parameters.
 
     Args:
         params_obj: A ParameterEstimate object to inherit. Use case is to allow users
             to tweak ParameterEstimate and resubmit to 'lapgm_estim.estimate_parameters'.
         image: 'M' channel image with variable spatial dimensions.
         log_image: 'M' channel log-image with 'N' voxels flattened in the last axis.
-        init_setting: Collection of keyword arguments determining how to run the 
-            k-means initializer.
-        solver_settings: Collection of keyword arguments to modify the sparse solver.
-            By default the solver is a conjugate gradient routine, but this can be
-            updated using the 'setup_solver' method.
-        save_settings: Collection of keyword arguments to determine which parameters
-            get stored in history.
+        init_setting: Settings to run on the k-means initializer.
+        solver_settings: Sparse solver settings. Default solver is a conjugate gradient
+            routine. Solver type can be updated through the 'setup_solver' method.
+        save_settings: Determines which parameters get stored in history.
 
 
     Attributes:
-        spat_shape_in (tuple): Spatial dimension of image input. Contains a total of 'N'
-            elements.
-        spat_shape_out (tuple): Original spatial dimension of image (not input). May
-            total to more than 'N' elements.
+        spat_shape_in (tuple): Spatial dimension of image input. Totals 'N' elements.
+        spat_shape_out (tuple): Original spatial dimension of image (not input).
         n_classes (int): Number of classes 'K' to use in mixture.
         pi (Array[float, 'K']): Array of class probabilities.
-        mu (Array[float, ('K', 'M')]): Multi-sequence means indexed by class.  
-        Sigma (Array[float, ('K', 'M', 'M')]): Multi-sequence covariances indexed by
-            class.
-        w (Array[float, ('K', 'N')]): Array of class posterior probabilities for each
-            voxel.
+        mu (Array[float, ('K', 'M')]): Multi-sequence means.
+        Sigma (Array[float, ('K', 'M', 'M')]): Multi-sequence covariances.
+        w (Array[float, ('K', 'N')]): Array of class posterior probabilities.
         B (Array[float, N']): Bias field estimate of the image.
         Bdiff (float): Relative difference between subsequent bias field estimates.
         history (dict): Parameter estimate history for previous iterations. Parameter
@@ -64,10 +57,8 @@ class ParameterEstimate:
 
         Args:
             image: 'M' channel image with variable spatial dimensions.
-            log_image: 'M' channel log-image with 'N' voxels flattened in the last 
-                axis.
-            init_setting: Collection of keyword arguments determining how to run the 
-                k-means initializer.
+            log_image: 'M' channel log-image with 'N' flattened voxels.
+            init_setting: Settings to run on the k-means initializer.
         """
         n_seqs, *spat_shape = image.shape
 
@@ -106,8 +97,7 @@ class ParameterEstimate:
 
         Args:
             solver: Sparse linear solver.
-            solver_settings: Collection of keyword arguments to modify the sparse 
-                solver.
+            solver_settings: Sparse solver settings.
         """
         if solver is None:
             self.solver = sp_cg_wrapper(solver_settings)
@@ -136,8 +126,7 @@ class ParameterEstimate:
         """Upscales parameters with image dimensions while offload any GPU params.
 
         Args:
-            upscaler: Function which takes downsampled image and upscales to
-                original shape
+            upscaler: Function which upscales downscaled image to original shape.
             orig_spat: Original spatial shape to match.
             scale_fctr: Scale factor to upscale spatial dimensions by.
         """
@@ -210,12 +199,10 @@ def get_class_masks(I: Array[float, ('M', '...')], n_classes: int, n_init: int, 
     Args:
         I: 'M' channel image with 'N' voxels flattened in the last axis.
         n_classes: Number of classes 'K' to fit data on.
-        n_init: Number of times to run k-means with different centroid seeds. Best output of 
-            n_init is used.
+        n_init: Number of times to run k-means with different centroid seeds.
         max_iter: Maximum number of iterations for a given k-means run.
 
-    Returns a boolean array. First axis contains class membership while the second axis 
-        corresponds to the flattened spatial position.
+    Returns a boolean array. Each spatial position is assigned a one-hot class encoding.
     """
     # sklearn's k-means uses numpy arrays, so cast appropriately
     if _USE_GPU:

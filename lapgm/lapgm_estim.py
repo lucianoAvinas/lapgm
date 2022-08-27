@@ -12,24 +12,63 @@ from .typing_details import RuntimeFunc as zoom
 
 
 class LapGM:
-    def __init__(self, downscale_factor: int = 1, scaling_order: int = 3, 
+    """Sets up LapGM debias method and runs parameter estimates for multichannel images.
+
+    Args:
+        downscale_factor: Ratio to scale down spatial dimensions by.
+        scaling_order: Interpolation smoothness order to use when up/downscaling.
+        store_history: Determines whether previous parameter estimates should be recorded.
+        unstore_large: Stops any recording on large spatial parameters like 'w' (posterior
+            class probabilities) and 'B' (bias field estimate).
+
+    Attributes:
+        scale_fctr (float): Downscale factor in scipy.zoom convention (1/downscale).
+        scaling_order (int): Interpolation smoothness order to use when up/downscaling.
+        save_settings (dict[str, bool]): Collects store_history and unstore_large.
+        tau (float): Hyperparameter penalty strength on bias field gradient
+        init_settings (dict): Settings to pass on to a k-means initializer.
+        weight_settings (dict): Settings to determine weighting scheme on graph Laplacian.
+    """
+    def __init__(self, downscale_factor: float = 1, scaling_order: int = 3, 
                  store_history: bool = False, unstore_large: bool = True):
+        if downscale_factor < 1:
+            raise ValueError('Downscale factor should be larger than 1 to save on computation.')
+
         self.scale_fctr = 1/downscale_factor
-        self.scaling_smoothness = scaling_order
+        self.scaling_order = scaling_order
         self.save_settings = dict(store_history=store_history, unstore_large=unstore_large)
 
         self.tau = None
         self.init_settings = None
         self.weight_settings = None
 
-    def specify_cylindrical_decay(self, alpha, axes_of_symmetry: tuple[int] = (0,), 
+    def specify_cylindrical_decay(self, alpha: float, axes_of_symmetry: tuple[int] = (0,), 
                                   center: tuple[int] = (0,0), semi_axes: tuple[int] = (1,1)):
+        """Sets a power-decay weighting with cylindrical symmetry on Laplacian 'L'
+
+        Args:
+            alpha: Power to decay by. Goes as x^(-alpha).
+            axes_of_symmetry: Spatial axes on which weighting should remain invariant.
+            center: Center point for outgoing radial weights of cylinder. Center is in image
+                centered coordinates, so +/-1 moves center by one unit. 
+            semi_axes: Semi-major axes of cylinder. 
+        """
         wgt_func = lambda x: x**(-alpha)
         self.weight_settings = dict(wgt_func=wgt_func, axes_of_symmetry=axes_of_symmetry, 
                                     center=center, semi_axes=semi_axes)
 
-    def set_hyperparameters(self, n_classes: int, tau: float, log_initialize: bool = True, 
+    def set_hyperparameters(self, tau: float, n_classes: int, log_initialize: bool = True, 
                             kmeans_n_init: int = 5, kmeans_max_iters: int = 300):
+        """Sets hyperparameters for the LapGM method.
+
+        Args:
+            tau: Hyperparameter penalty strength on bias field gradient
+            log_initialize: Determines whether raw intensity or log intensities should be
+                used when running k-means initializer.
+            n_classes: Number of classes for the LapGM model.
+            kmeans_n_init: Number of times to run k-means with different centroid seeds.
+            kmeans_max_iter: Maximum number of iterations for a given k-means run.
+        """
         self.tau = tau
         self.init_settings = dict(n_classes=n_classes, log_initialize=log_initialize, 
                                   n_init=kmeans_n_init, max_iters=kmeans_max_iters)
@@ -39,10 +78,26 @@ class LapGM:
                             max_cg_iters: int = 25000, random_seed: int = 1,  
                             print_tols: bool = False, params_obj: ParameterEstimate = None, 
                             custom_wgts: Array[float, 'N'] = None):
+        """Estimate parameters for the LapGM model.
 
-        # set max_em_iters to zero to get just inital_param estimate and then modify
-        # mention this in documentation of params_obj
+        Setting max_em_iters to zero returns default initialized ParameterEstimate object 
+        for image input.
 
+        Args:
+            image: Multichannel image with variable spatial dimensions.
+            n_seqs: Specifies the number of sequences 'M' in multichannel image.
+            bias_tol: Relative tolerance to stop on if subsequent bias estimates are 
+                close in value.
+            max_em_iters: Maximum number of MAP optimization steps to do.
+            max_cg_iters: Maximum number of conjugate gradient steps for bias inverse step.
+            random_seed: Sets seed for the parameter estimation.
+            print_tols: Prints relative bias differences if true.
+            param_obj: Custom ParameterEstimate object to initialize bias field estimation.
+                May contain custom solver for bias inverse step.
+            custom_wgts: Custom multiplicative weights to construct Laplacian 'L' with.
+
+        Returns a ParameterEstimate object for image input.
+        """
         # check if number of sequences matches first axis length
         image = check_seq_shape(image, n_seqs)
 
@@ -54,7 +109,7 @@ class LapGM:
 
         # downscale image
         per_seq_sc = [1] + [self.scale_fctr]*len(spat_shape)
-        image = abs(zoom(image, per_seq_sc, order=self.scaling_smoothness, mode='nearest'))        
+        image = abs(zoom(image, per_seq_sc, order=self.scaling_order, mode='nearest'))        
 
         # flatten spatial axes and log
         spat_ds_shape = image.shape[1:]
@@ -86,23 +141,32 @@ class LapGM:
         
         # define upscaler and apply
         upscaler = lambda img_ds, targ_shp, sc_lst: scale_and_pad(img_ds, targ_shp, sc_lst, 
-                                                                  self.scaling_smoothness)
+                                                                  self.scaling_order)
         params.upscale_parameters(upscaler, spat_shape, 1/self.scale_fctr)
 
         return params
 
 
 def check_seq_shape(image: Array[Any, ('M', '...')], n_seqs: int):
+    """Checks whether image first axis matches n_seqs in size.
+    
+    Returns image with possible dummy axis for the case of n_seqs = 1.
+    """
     if image.shape[0] != n_seqs:
         if n_seqs == 1:
             image = image[None]
         else:
-            raise ValueError(f'User specifed {n_seqs} sequences but image has dimension '
-                             f'{image.shape[0]} on the first axis.')
+            raise ValueError(f'User specifed {n_seqs} sequences but image has '
+                             f'dimension {image.shape[0]} on the first axis.')
     return image
 
 
 def fill_zeros_and_log(image: Array[Any, ('...')]):
+    """Takes log on non-negative images.
+
+    Zeros are handled through a uniform random fill with magnitude 
+    up to half of minimum non-zero value of image.
+    """
     zero_mask = (image == 0)
 
     min_val = ap.min(image[~zero_mask])//2
@@ -114,13 +178,19 @@ def fill_zeros_and_log(image: Array[Any, ('...')]):
 
 def scale_and_pad(scale_img: Array[float, ('...')], orig_dims: tuple[int], 
                   scale_fctrs: tuple[float], smooth_order: int):
+    """Upscale previously downscaled image to its original dimensions.
+
+    Original dimensions may not have divided nicely with scaling factor.
+    Slight cropping and padding will be handed inside scale_and_pad.
+
+    Args:
+        scale_img: Downscaled image.
+        orig_dim: Dimensions of original image.
+        scale_fctrs: Tuple of scaling factors for per-axis upscales.
+        smooth_order: Interpolation smoothness order for upscales.
+
+    Returns upscaled image with original image dimensions.
     """
-        scale_img: downscaled image
-        orig_dim: dimensions of original image
-        scale_fctrs: tuple of scaling factors for per-axis downscale/upscale
-        smooth_order: order of smoothness to interpolate with
-    """
-        
     img = abs(zoom(scale_img, scale_fctrs, order=smooth_order, mode='nearest'))
 
     # calculate dimension offset between upsampled image and original image

@@ -10,18 +10,15 @@ from .typing_details import SparsePackage as sp
 
 
 def construct_dirichlet_lap(bounds: tuple[int], upper_only: bool = False):
-    """Constructs a weighted discrete Laplacian for a multidimensional grid graph.
+    """Constructs weighted discrete Laplacian for multidimensional grid graphs.
 
-        Calculation done in terms of Kronecker sums. Assume Dirichlet boundary conditions.
+    Calculation done with of Kronecker sums. Assumes Dirichlet boundary conditions.
 
     Args:
-        bounds (tuple[int]): Respective dimensions of the multidimensional grid graph.
-        wgts (Array['N', float]): Per voxel weighting array 
+        bounds: Respective dimensions of the multidimensional grid graph.
+        upper_only: Function returns upper triangular array if true.
 
-    Returns:
-        Array['N,N', float]:
-            Returns a weighted discrete Laplacian in flattened index notation. Shape 'N'
-            is equal to the generalized volume of the grid.
+    Returns a weighted discrete graph Laplacian in flattened index notation. 
     """
     N = reduce(mul, bounds)
     L = sp.csr_matrix((N,N), dtype=float)
@@ -54,6 +51,8 @@ def construct_dirichlet_lap(bounds: tuple[int], upper_only: bool = False):
 
 
 def weight_laplacian(L_upper: Array[float, ('N', 'N')], wgts: Array[float, 'N']):
+    """# talk about vertex weighting
+    """
     # apply voxel weighting as an edge weight
     L_upper = L_upper.multiply(wgts)
     L = L_upper + L_upper.T
@@ -80,9 +79,11 @@ def prepare_wgts(bounds: tuple, wgt_func: Callable, coord_transf: Callable,
 
     bounds_subset = tuple(n_i for i,n_i in enumerate(bounds) if i not in axes_of_symmetry)
 
-    # get centered, unit coordinates
-    dim_max = (max(bounds_subset)-1)/2
-    sparse_coords = [(ap.arange(n_i) - (n_i-1)/2) / dim_max for n_i in bounds_subset]
+    sparse_coords = []
+    shap_len = len(bounds_subset)
+    for i,n_i in enumerate(bounds_subset):  # center and promote axes of coordinate dims
+        ni_axes = [j for j in range(shap_len) if j != i]
+        sparse_coords.append(ap.expand_dims(ap.arange(n_i) - (n_i-1)/2, ni_axes))
 
     # transform sparse coordinates (possibly to a new representation) 
     # and apply weighting scheme.

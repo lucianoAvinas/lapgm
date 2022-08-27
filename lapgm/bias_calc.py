@@ -20,15 +20,13 @@ def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N
 
     Args:
         I_log: 'M' channel log-image with 'N' voxels flattened in the last axis.
-        L: Weighted Laplacian matrix corresponding to the spatial structure of the 'N'
-            nodes.
+        L: Weighted Laplacian matrix for spatial structure of the 'N' nodes.
         params: Container for parameter estimate and history.
-        bias_tol: Relative tolerance value to stop computation if subsequent bias field
-            estimates are close in value.
+        bias_tol: Relative tolerance to stop on if subsequent bias estimates are 
+            close in value.
         max_iters: Maximum number of MAP optimization steps to do.
-        random_seed: Sets the seed for the order of the randomly permuted block updates.
-        print_tols: Determines whether relative differences for subsequent bias field 
-            estimates should be printed.
+        random_seed: Set seed for randomly permuted block updates.
+        print_tols: Prints relative bias differences if true.
 
     Returns final parameter estimate with parameter history.
     """
@@ -65,8 +63,7 @@ def e_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
 
     Args:
         I_log: 'M' channel log-image with 'N' voxels flattened in the last axis.
-        L: Weighted Laplacian matrix corresponding to the spatial structure of the 'N'
-            nodes.
+        L: Weighted Laplacian matrix for spatial structure of the 'N' nodes.
         params: Container for parameter estimate and history.
     """
     N = I_log.shape[1]
@@ -88,8 +85,7 @@ def gauss_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
 
     Args:
         I_log: 'M' channel log-image with 'N' voxels flattened in the last axis.
-        L: Weighted Laplacian matrix corresponding to the spatial structure of the 'N'
-            nodes.
+        L: Weighted Laplacian matrix for spatial structure of the 'N' nodes.
         params: Container for parameter estimate and history.
     """
     N = I_log.shape[1]
@@ -118,8 +114,7 @@ def bias_step(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N')],
 
     Args:
         I_log: 'M' channel log-image with 'N' voxels flattened in the last axis.
-        L: Weighted Laplacian matrix corresponding to the spatial structure of the 'N'
-            nodes.
+        L: Weighted Laplacian matrix for spatial structure of the 'N' nodes.
         params: Container for parameter estimate and history.
     """
     M,N = I_log.shape

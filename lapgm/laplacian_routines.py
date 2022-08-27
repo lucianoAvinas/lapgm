@@ -99,7 +99,7 @@ def prepare_wgts(bounds: tuple, wgt_func: Callable, coord_transf: Callable,
     sparse_coords = []
     shap_len = len(bounds_subset)
     for i,n_i in enumerate(bounds_subset):  # center and promote axes of coordinate dims
-        ni_axes = [j for j in range(shap_len) if j != i]
+        ni_axes = tuple(j for j in range(shap_len) if j != i)
         sparse_coords.append(ap.expand_dims(ap.arange(n_i) - (n_i-1)/2, ni_axes))
 
     # transform sparse coordinates (possibly to a new representation) 

@@ -8,6 +8,9 @@ from sklearn.cluster import KMeans
 from .typing_details import ArrayPackage as ap
 from .typing_details import SparseLinalgPackage as spl
 
+# Compute always initialized to CPU
+_USE_GPU = False
+
 
 class ParameterEstimate:
     """Stores and transfers computed parameters.

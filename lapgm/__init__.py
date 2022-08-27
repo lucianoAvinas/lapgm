@@ -43,7 +43,7 @@ ARRAY_PKGS = ('ap', 'sp', 'spl', 'zoom', 'multi_normal')
 
 
 def module_set(mod: ModuleType, attr_nms: tuple[str], options: dict[str, ModuleType]):
-    """Helper function for quick attribute assignment on submodules"""
+    """Helper function for quick attribute assignment on submodules."""
     for attr_nm in attr_nms:
         setattr(mod, attr_nm, options[attr_nm])
 
@@ -53,10 +53,12 @@ def use_gpu(assign_bool: bool):
 
     Raises ModuleNotFoundError if user sets compute to GPU while missing relevant packages.
     """
+    # map boolean value to appropriate pkg suffix
     if assign_bool:
         if _USE_GPU:
             pkg_suff = 'gpu'
         else:
+            # catch invalid compute assignment
             raise ModuleNotFoundError(ERR)
     else:
         pkg_suff = 'cpu'
@@ -72,6 +74,9 @@ def use_gpu(assign_bool: bool):
     module_set(param_setup, ('ap', 'spl'), options)
     module_set(lapgm_estim, ('ap', 'zoom'), options)
     module_set(laplacian_routines, ('ap', 'sp'), options)
+
+    # additionally update compute metadata for param_setup
+    param_setup._USE_GPU = _USE_GPU
 
 
 ### Initialize preferred array package to CPU ###

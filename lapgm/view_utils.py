@@ -33,6 +33,7 @@ def apply_mask(image_collection: Array[float, ('...', 'X')], mask: Array[bool, '
 
 
 def save_or_show(save_path: str):
+    """Saves matplotlib figure if save path is provided."""
     if save_path is None:
         plt.show()
     else:

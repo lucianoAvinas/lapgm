@@ -9,7 +9,7 @@ from .typing_details import ArrayPackage as ap
 from .typing_details import SparseLinalgPackage as spl
 
 # Compute always initialized to CPU
-_USE_GPU = False
+_ON_GPU = False
 
 
 class ParameterEstimate:
@@ -157,7 +157,7 @@ class ParameterEstimate:
 
     def offload_param_and_history(self, param_nm: str):
         """Cast parameter and its history to CPU."""
-        if _USE_GPU:
+        if _ON_GPU:
             # offload parameter estimate
             setattr(self, param_nm, ap.asnumpy(getattr(self, param_nm)))
 
@@ -208,7 +208,7 @@ def get_class_masks(I: Array[float, ('M', '...')], n_classes: int, n_init: int, 
     Returns a boolean array. Each spatial position is assigned a one-hot class encoding.
     """
     # sklearn's k-means uses numpy arrays, so cast appropriately
-    if _USE_GPU:
+    if _ON_GPU:
         I = ap.asnumpy(I)
 
     _, N = I.shape

@@ -30,13 +30,13 @@ try:
     import cupyx.scipy.sparse.linalg as spl_gpu
     from cupyx.scipy.ndimage import zoom as zoom_gpu
     from .cupyx_mvn import multivariate_normal as multi_normal_gpu
-    _USE_GPU = True
+    _HAS_GPU = True
 
 except ModuleNotFoundError as err:
     warnings.warn(f'Certain GPU array packages could not be found. ' + \
                    'lapgm.use_gpu will be restricted to cpu arrays only.')
     ERR = err
-    _USE_GPU = False
+    _HAS_GPU = False
 
 # Naming conventions for CPU/GPU array packages
 ARRAY_PKGS = ('ap', 'sp', 'spl', 'zoom', 'multi_normal')
@@ -55,13 +55,16 @@ def use_gpu(assign_bool: bool):
     """
     # map boolean value to appropriate pkg suffix
     if assign_bool:
-        if _USE_GPU:
+        if _HAS_GPU:
             pkg_suff = 'gpu'
         else:
             # catch invalid compute assignment
             raise ModuleNotFoundError(ERR)
     else:
         pkg_suff = 'cpu'
+
+    # update compute metadata on param_setup for parameter off-loading
+    param_setup._ON_GPU = bool
 
     # get module object
     module_self = sys.modules[__name__]
@@ -74,9 +77,6 @@ def use_gpu(assign_bool: bool):
     module_set(param_setup, ('ap', 'spl'), options)
     module_set(lapgm_estim, ('ap', 'zoom'), options)
     module_set(laplacian_routines, ('ap', 'sp'), options)
-
-    # additionally update compute metadata for param_setup
-    param_setup._USE_GPU = _USE_GPU
 
 
 ### Initialize preferred array package to CPU ###

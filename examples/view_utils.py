@@ -5,7 +5,7 @@ from typing import Any
 from scipy.stats import gaussian_kde
 from matplotlib.patches import Patch
 
-from .typing_details import Array
+from lapgm.typing_details import Array
 
 SAVE_DPI = 300
 
@@ -42,7 +42,7 @@ def save_or_show(save_path: str):
 
 
 def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Array[bool, ('...')], 
-                       color_scale: bool = False, title_names: list[str] = None, 
+                       color_scale: bool = True, title_names: list[str] = None, 
                        full_save_path: str = None):
     """
         image_volumes: collection of 3 axes arrays
@@ -92,7 +92,7 @@ def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Ar
             tl_name = title_names[i,j]
             img_slice = axes_slices[j][i]
 
-            ax.imshow(img_slice, vmin=cmin, vmax=cmax, interpolation='none')
+            ax.imshow(np.flipud(img_slice), vmin=cmin, vmax=cmax, interpolation='none')
             ax.axis('off')
             ax.set_title(tl_name)
 
@@ -113,7 +113,7 @@ def view_class_map(w_vol: Array[float, ('K','...')], slice_ind: int = None, slic
     cmap = plt.get_cmap('tab10', K)
     colors = cmap.colors
 
-    plt.imshow(w_cls, cmap=cmap)
+    plt.imshow(np.flipud(w_cls), cmap=cmap, interpolation='none')
     plt.axis('off')
     plt.legend(handles=[Patch(facecolor=colors[i],label=rf'cls ${i}$') for i in range(K)])
 

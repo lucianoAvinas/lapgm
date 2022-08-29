@@ -1,14 +1,13 @@
 import sys
 import warnings
 import numpy as np
-from typing import Callable
 from types import ModuleType
+from typing import Callable, Any
 
 # function shortcuts
 from .typing_details import Array
 from .param_setup import ParameterEstimate
-from .lapgm_estim import LapGM, check_seq_shape
-from .view_utils import view_center_slices, view_class_map, view_distributions
+from .lapgm_estim import LapGM, check_seq_data
 
 # for __init__ array package assignment
 from lapgm import bias_calc
@@ -83,6 +82,21 @@ def use_gpu(assign_bool: bool):
 use_gpu(False)
 
 
+def to_sequence_array(image_lst: list[Array[Any, ('...')]]):
+    """Collects array list into a CPU float array. Appends sequence metadata.
+
+    Single image arrays will be disambiguated by taking outer list as a dummy axis.
+    """
+    # specify metadata for array
+    n_seqs = len(image_lst)
+    dt = np.dtype(float, metadata={'n_seqs':n_seqs})
+
+    # collect images into single float array with metadata
+    image_arr = np.array(image_lst, dtype=dt)
+
+    return image_arr
+
+
 def debias(image: Array[float, ('M', '...')], params: ParameterEstimate):
     """Debias image using previously computed LapGM parameters.
 
@@ -94,19 +108,24 @@ def debias(image: Array[float, ('M', '...')], params: ParameterEstimate):
 
     Returns debiased image.
     """
-    nonzero_mask = (image > 0)
-    deb_image = np.zeros(image.shape)
+    # confirm sequence sequence metadata is preserved
+    check_seq_data(image)
 
-    image_nz = image[nonzero_mask]
-    B_nz = params.B[nonzero_mask]
+    deb_image = np.array(image)
+    for i,image_seq in enumerate(image):
+        nz_mask = image_seq > 0
 
-    deb_image[nonzero_mask] = np.exp(np.log(image_nz) - B_nz)
+        seq_nz = image_seq[nz_mask]
+        B_nz = params.B[nz_mask]
+
+        deb_image[i, nz_mask] = np.exp(np.log(seq_nz) - B_nz)
+
     return deb_image
 
 
-def normalize(image: Array[float, ('M', '...')], n_seqs: int, 
-              params: ParameterEstimate, target_intensity: float = 1000., 
-              norm_fn: Callable = None,  per_seq_norm: bool = True):
+def normalize(image: Array[float, ('M', '...')], params: ParameterEstimate, 
+              target_intensity: float = 1000., norm_fn: Callable = None,  
+              per_seq_norm: bool = True):
     """Normalizes image intensity values with LapGM parameter information.
 
     Normalization procedure depends on chosen norm_fn. By default this
@@ -114,7 +133,6 @@ def normalize(image: Array[float, ('M', '...')], n_seqs: int,
 
     Args:
         image: 'M' channel image with variable spatial dimensions.
-        n_seqs: Specifies number of sequences 'M' in multichannel image.
         params: Previously computed LapGM parameters.
         target_intensity: Scale to target when normalizing image intensities.
         norm_fn: Function to use when normalizing image. Takes in: 
@@ -124,7 +142,8 @@ def normalize(image: Array[float, ('M', '...')], n_seqs: int,
 
     Returns normalized image with target scaling applied.
     """
-    image = check_seq_shape(image, n_seqs)
+    # check if number of sequences matches first axis length
+    n_seqs = check_seq_data(image)
 
     if norm_fn is None:
         norm_fn = max_norm_fn

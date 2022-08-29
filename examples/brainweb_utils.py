@@ -1,8 +1,10 @@
 import gzip
-import requests
 import numpy as np
+import urllib.request
 
 from pathlib import Path
+from urllib.error import URLError
+from scipy.ndimage import gaussian_filter
 
 
 # Inspired by Casper O. da Costa-Luis's brainweb download routines.
@@ -18,13 +20,13 @@ ARR_SHAPE = (181, 217, 181)
 
 def write_compressed(url: str, file_path: str):
     # writing a compressed response: https://stackoverflow.com/a/13137873
-    req = requests.get(url, stream=True)
-    if req:
+    try:
+        req = urllib.request.urlopen(url)
         with open(file_path, 'wb') as fp:
             for chunk in req:
                 fp.write(chunk)
-    else:
-        raise RuntimeError(f'Bad url request: {url}')
+    except URLError as err:
+        raise URLError(f'Bad url request: {url}\n Error: {err}')
 
 
 def gz_to_numpy(gz_fname: str, shape: tuple[int], dtype: type[np.dtype]):
@@ -56,7 +58,7 @@ def download_and_read_normal(data_path: str = 'data', slice_thickness: int = 1, 
     data_arrays = dict()
     url_base = 'http://brainweb.bic.mni.mcgill.ca/cgi/brainweb1?do_download_alias='
 
-    for modality in ['T1', 'T2', 'PD']:
+    for modality in MODALITY_TYPES:
         file_name = f'{modality.lower()}_{slice_thickness}mm_pn{noise}_rf{rf_intensity}.raws.gz'
         file_path = data_path / Path(file_name)
 
@@ -75,3 +77,39 @@ def download_and_read_normal(data_path: str = 'data', slice_thickness: int = 1, 
         data_arrays[modality] = arr
 
     return data_arrays
+
+
+def generate_consistent_bias(data_path: str = 'data', wgts: tuple[float] = (1/3,1/3,1/3)):
+    clean_data = download_and_read_normal(data_path, noise=0, rf_intensity=0)
+    biased_data = download_and_read_normal(data_path, noise=0, rf_intensity=40)
+    tissue_mask = download_and_read_phantom(data_path) > 0
+
+    bias_arr = []
+    for cl_mod, bi_mod in zip(clean_data.values(), biased_data.values()):
+        bias = np.zeros(cl_mod.shape, dtype=float)
+        nz_mask = np.logical_and(tissue_mask, cl_mod > 0)
+
+        bias[nz_mask] = bi_mod[nz_mask] / cl_mod[nz_mask]
+        bias_arr.append(bias)
+
+    wgts = np.expand_dims(wgts, (1,2,3))
+    bias = np.sum(np.array(bias_arr) * wgts, axis=0)
+    bias = gaussian_filter(bias, sigma=0.75)
+
+    return bias
+
+
+def get_biased_data(data_path: str = 'data', bias_example_id: int = 0):
+    ind = 2 - bias_ex
+    wgts = [0 if i != ind else 1 for i in range(3)]
+
+    data = download_and_read_normal(data_path, noise=0, rf_intensity=0)
+    bias = generate_consistent_bias(data_path, tuple(wgts))
+
+    for modality in MODALITY_TYPES:
+        biased_dat = data[modality] * bias
+        data[modality] = biased_dat / np.max(biased_dat)
+
+    data['bias'] = bias
+
+    return data

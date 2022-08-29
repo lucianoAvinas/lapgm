@@ -85,7 +85,7 @@ class ParameterEstimate:
         self.n_seqs = n_seqs
         self.n_classes = pi.shape[0]
 
-        self.w = w
+        self.w = w.astype(float)
         self.pi = pi
         self.mu = mu
         self.Sigma = Sigma

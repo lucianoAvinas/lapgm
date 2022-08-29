@@ -100,7 +100,7 @@ def generate_consistent_bias(data_path: str = 'data', wgts: tuple[float] = (1/3,
 
 
 def get_biased_data(data_path: str = 'data', bias_example_id: int = 0):
-    ind = 2 - bias_ex
+    ind = 2 - bias_example_id
     wgts = [0 if i != ind else 1 for i in range(3)]
 
     data = download_and_read_normal(data_path, noise=0, rf_intensity=0)

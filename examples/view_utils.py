@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 
 from typing import Any
 from scipy.stats import gaussian_kde
-from matplotlib.patches import Patch
-
 from lapgm.typing_details import Array
 
 SAVE_DPI = 300
@@ -26,10 +24,7 @@ def apply_mask(image_collection: Array[float, ('...', 'X')], mask: Array[bool, '
         masked_collection = np.zeros_like(image_collection)
         masked_collection[...,mask] = masked_values
 
-    cmin = masked_collection.min()
-    cmax = masked_collection.max()
-
-    return masked_collection, cmin, cmax
+    return masked_collection
 
 
 def save_or_show(save_path: str):
@@ -41,9 +36,8 @@ def save_or_show(save_path: str):
         plt.clf()
 
 
-def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Array[bool, ('...')], 
-                       color_scale: bool = True, title_names: list[str] = None, 
-                       full_save_path: str = None):
+def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Array[bool, ('...')] = None, 
+                       title_names: list[str] = None, cmap_name: str = 'viridis', full_save_path: str = None):
     """
         image_volumes: collection of 3 axes arrays
         mask: boolean array with same spatial size as image volume. Emphasizes important regions
@@ -59,63 +53,54 @@ def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Ar
     elif len(image_volumes.shape) < 3:
         raise ValueError(f"Input 'image_volume' should have at least 3 axes")
 
-    elif abs(len(image_volumes.shape) - len(mask_volume.shape)) > 1:
-        raise ValueError("Inputs 'image_volume' and 'mask_volume' differ by more than 2 axes")
-
     T, *dims = image_volumes.shape
-    fig, axs = plt.subplots(T, 3)
-
-    # promote axes
-    axs = np.expand_dims(axs,0) if T == 1 else axs
+    image_maskd = apply_mask(image_volumes, mask_volume)
 
     axes_slices = []
-    cmin, cmax = np.inf, -np.inf
     for i in range(3):
-        imgs_slice = np.take(image_volumes, dims[i]//2, i+1)
-        mask_slice = np.take(mask_volume, dims[i]//2, i)
-
-        imgs_mask_sl, cmin_i, cmax_i = apply_mask(imgs_slice, mask_slice)
-
-        cmin = min(cmin, cmin_i)
-        cmax = max(cmax, cmax_i)
+        imgs_mask_sl = np.take(image_maskd, dims[i]//2, i+1)  
         axes_slices.append(imgs_mask_sl)
 
-    title_names = fill_list(title_names, 3*T)
-    title_names = np.array(title_names).reshape(T, 3)
+    fig = plt.figure()
+    subfigs = fig.subfigures(nrows=T, ncols=1)
+    title_names = fill_list(title_names, T)
 
-    if not color_scale:
-        cmin, cmax = (None, None)
+    # Add dummy axis for single volume. Also adjust suptile y-position.
+    if T == 1:
+        subfigs = [subfigs]
+        suptl_pos = 0.75
+    else:
+        suptl_pos = 1
 
-    for i in range(T):
-        for j in range(3):
-            ax = axs[i,j]
-            tl_name = title_names[i,j]
+    for i, subfg in enumerate(subfigs):
+        subfg.suptitle(title_names[i], y=suptl_pos)
+        axs = subfg.subplots(nrows=1, ncols=3)
+        for j, ax in enumerate(axs):
             img_slice = axes_slices[j][i]
-
-            ax.imshow(np.flipud(img_slice), vmin=cmin, vmax=cmax, interpolation='none')
+            ax.imshow(np.flipud(img_slice), interpolation='none', cmap=cmap_name)
             ax.axis('off')
-            ax.set_title(tl_name)
 
     save_or_show(full_save_path)
 
 
-def view_class_map(w_vol: Array[float, ('K','...')], slice_ind: int = None, slice_ax: int = 0,
-                   order: Array[int, 'K'] = None, full_save_path: str = None):
+def view_class_map(w_vol: Array[float, ('K','...')], order: Array[int, 'K'] = None, 
+                   title_name: str = None, full_save_path: str = None):
     K, *spat_shp = w_vol.shape
 
-    if slice_ind is None:
-        slice_ind = spat_shp[slice_ax]//2
-
-    if order is not None:  # for example if order = np.argsort(params.mu[seq_id])
+    if order is not None: 
         w_vol = w_vol[order]
 
-    w_cls = np.argmax(np.take(w_vol, slice_ind, slice_ax+1), axis=0)
+    w_vol = np.argmax(w_vol, axis=0)
     cmap = plt.get_cmap('tab10', K)
-    colors = cmap.colors
 
-    plt.imshow(np.flipud(w_cls), cmap=cmap, interpolation='none')
-    plt.axis('off')
-    plt.legend(handles=[Patch(facecolor=colors[i],label=rf'cls ${i}$') for i in range(K)])
+    d = len(spat_shp)
+    fig, axs = plt.subplots(1, d)
+    for i in range(d):
+        ax = axs[i]
+        ax.imshow(np.flipud(np.take(w_vol, spat_shp[i]//2, i)), cmap=cmap, interpolation='none')
+        ax.axis('off')
+
+    fig.suptitle(title_name, y=0.75)
 
     save_or_show(full_save_path)
 
@@ -139,12 +124,6 @@ def fill_list(vals: Any, length:int):
     try:
         vals[0]
     except TypeError:
-        vals = [vals]
-
-    repeat_mult = length//len(vals)
-    vals = vals * repeat_mult
-
-    len_rem = length - len(vals)
-    vals = vals + vals[:len_rem]
+        vals = [vals]*length
     
     return vals

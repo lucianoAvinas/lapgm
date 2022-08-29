@@ -4,12 +4,12 @@ import numpy as np
 from types import ModuleType
 from typing import Callable, Any
 
-# function shortcuts
+# package shortcuts
 from .typing_details import Array
 from .param_setup import ParameterEstimate
 from .lapgm_estim import LapGM, check_seq_data
 
-# for __init__ array package assignment
+# for __init__ array assignment
 from lapgm import bias_calc
 from lapgm import param_setup
 from lapgm import lapgm_estim
@@ -37,7 +37,7 @@ except ModuleNotFoundError as err:
     ERR = err
     _HAS_GPU = False
 
-# Naming conventions for CPU/GPU array packages
+# Module naming conventions for different array packages
 ARRAY_PKGS = ('ap', 'sp', 'spl', 'zoom', 'multi_normal')
 
 

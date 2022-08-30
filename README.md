@@ -15,7 +15,7 @@ pip install lapgm[gpu]
 
 # Examples
 
-An overview on how to debias and normalize with **lapgm** is provided in the 'examples' subdirectory. Three presets from the *BrainWeb* normal dataset are used. Some of the debiasing and normalization results are shown below.
+An overview on how to debias and normalize with **lapgm** is provided in the 'examples' subdirectory. Three presets from the [*BrainWeb*](https://brainweb.bic.mni.mcgill.ca/) normal dataset are used. Some of the debiasing and normalization results are shown below.
 
 <p align="center">
   <img width="400" src="https://github.com/lucianoAvinas/biasgen/raw/main/images/biased_data.png">

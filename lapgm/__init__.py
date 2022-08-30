@@ -120,11 +120,14 @@ def debias(image: Array[float, ('M', '...')], params: ParameterEstimate):
 
         deb_image[i, nz_mask] = np.exp(np.log(seq_nz) - B_nz)
 
+    # re-append sequence metadata
+    deb_image = to_sequence_array([*deb_image])
+
     return deb_image
 
 
 def normalize(image: Array[float, ('M', '...')], params: ParameterEstimate, 
-              target_intensity: float = 1000., norm_fn: Callable = None,  
+              target_intensity: float, norm_fn: Callable = None,  
               per_seq_norm: bool = True):
     """Normalizes image intensity values with LapGM parameter information.
 
@@ -157,6 +160,9 @@ def normalize(image: Array[float, ('M', '...')], params: ParameterEstimate,
     else:
         sc = norm_fn(image, params)
         norm_image = image / sc  * target_intensity
+
+    # re-append sequence metadata
+    norm_image = to_sequence_array([*norm_image])
 
     return norm_image
 

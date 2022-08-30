@@ -3,3 +3,4 @@ lapgm.egg-info
 tests
 examples/__pycache__
 examples/.ipynb_checkpoints
+dist

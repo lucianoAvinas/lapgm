@@ -66,16 +66,12 @@ class ParameterEstimate:
         n_seqs, *spat_shape = image.shape
 
         if init_settings['log_initialize']:
-            w = get_class_masks(log_image, init_settings['n_classes'], 
-                                init_settings['n_init'],
-                                init_settings['max_iters'])
+            w = get_class_masks(log_image, init_settings['kmeans_settings'])
         else:
             # flatten spatial axes before k-means init
             image = image.reshape(n_seqs, -1)
 
-            w = get_class_masks(image, init_settings['n_classes'], 
-                                init_settings['n_init'],
-                                init_settings['max_iters'])
+            w = get_class_masks(image, init_settings['kmeans_settings'])
 
         pi, mu, Sigma = init_gaussian_mixture(log_image, w)
 
@@ -193,7 +189,7 @@ def renormalize_probs(prob_arr: Array[float, ('K','...')], class_ax: int = 0):
     return prob_arr
 
 
-def get_class_masks(I: Array[float, ('M', '...')], n_classes: int, n_init: int, max_iters : int):
+def get_class_masks(I: Array[float, ('M', '...')], kmeans_settings: dict):
     """Returns class membership arrays depending on closest cluster.
 
         Class membership is determined using the k-means algorithm on the spatially-flattened, 
@@ -201,9 +197,7 @@ def get_class_masks(I: Array[float, ('M', '...')], n_classes: int, n_init: int, 
 
     Args:
         I: 'M' channel image with 'N' voxels flattened in the last axis.
-        n_classes: Number of classes 'K' to fit data on.
-        n_init: Number of times to run k-means with different centroid seeds.
-        max_iter: Maximum number of iterations for a given k-means run.
+        kmeans_settings: Keyword arguments for sklearn.cluster.KMeans.
 
     Returns a boolean array. Each spatial position is assigned a one-hot class encoding.
     """
@@ -212,11 +206,11 @@ def get_class_masks(I: Array[float, ('M', '...')], n_classes: int, n_init: int, 
         I = ap.asnumpy(I)
 
     _, N = I.shape
-    labels = KMeans(n_clusters=n_classes, n_init=n_init, max_iter=max_iters).fit(
-                    I.T).labels_
+    n_clusters = kmeans_settings['n_clusters']
+    labels = KMeans(**kmeans_settings).fit(I.T).labels_
     
     # one-hot encoding of labels
-    label_masks = ap.zeros((n_classes, N), dtype=bool)
+    label_masks = ap.zeros((n_clusters, N), dtype=bool)
     label_masks[labels, ap.arange(N)] = True
 
     return label_masks

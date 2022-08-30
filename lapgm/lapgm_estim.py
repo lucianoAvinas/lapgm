@@ -61,8 +61,10 @@ class LapGM:
                             kmeans_n_init: int = 5, kmeans_max_iters: int = 300):
         """Sets hyperparameters for the LapGM method.
 
+        Initializer settings contains k-means setup information.
+
         Args:
-            tau: Hyperparameter penalty strength on bias field gradient
+            tau: Inverse regulariztion strength for bias field gradient
             log_initialize: Determines whether raw intensity or log intensities should be
                 used when running k-means initializer.
             n_classes: Number of classes for the LapGM model.
@@ -70,8 +72,9 @@ class LapGM:
             kmeans_max_iter: Maximum number of iterations for a given k-means run.
         """
         self.tau = tau
-        self.init_settings = dict(n_classes=n_classes, log_initialize=log_initialize, 
-                                  n_init=kmeans_n_init, max_iters=kmeans_max_iters)
+        self.init_settings = dict(log_initialize=log_initialize, kmeans_settings=dict(
+                                  n_clusters=n_classes, n_init=kmeans_n_init, 
+                                  max_iter=kmeans_max_iters, random_state=None))
 
     def estimate_parameters(self, image: Array[float, ('M', '...')], 
                             bias_tol: float = 1e-4, max_em_iters: int = 25, 
@@ -116,6 +119,7 @@ class LapGM:
         log_image = fill_zeros_and_log(image).reshape(n_seqs, -1)
 
         # construct initial parameter estimate
+        self.init_settings['kmeans_settings']['random_state'] = random_seed
         params = ParameterEstimate(params_obj, image, log_image, self.init_settings, 
                                    dict(maxiter=max_cg_iters), self.save_settings)
 

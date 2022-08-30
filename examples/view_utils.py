@@ -65,20 +65,19 @@ def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Ar
     subfigs = fig.subfigures(nrows=T, ncols=1)
     title_names = fill_list(title_names, T)
 
-    # Add dummy axis for single volume. Also adjust suptile y-position.
+    # Add dummy axis for single volume
     if T == 1:
         subfigs = [subfigs]
-        suptl_pos = 0.75
-    else:
-        suptl_pos = 1
 
     for i, subfg in enumerate(subfigs):
-        subfg.suptitle(title_names[i], y=suptl_pos)
         axs = subfg.subplots(nrows=1, ncols=3)
         for j, ax in enumerate(axs):
             img_slice = axes_slices[j][i]
             ax.imshow(np.flipud(img_slice), interpolation='none', cmap=cmap_name)
             ax.axis('off')
+
+            if j == 1:
+                ax.set_title(title_names[i])
 
     save_or_show(full_save_path)
 
@@ -94,28 +93,49 @@ def view_class_map(w_vol: Array[float, ('K','...')], order: Array[int, 'K'] = No
     cmap = plt.get_cmap('tab10', K)
 
     d = len(spat_shp)
-    fig, axs = plt.subplots(1, d)
+    fig = plt.figure()
+
+    # Subfigure routine centers the image triplet
+    subfig = fig.subfigures(nrows=1, ncols=1)
+    axs = subfig.subplots(nrows=1, ncols=d)
+
     for i in range(d):
         ax = axs[i]
         ax.imshow(np.flipud(np.take(w_vol, spat_shp[i]//2, i)), cmap=cmap, interpolation='none')
         ax.axis('off')
 
-    fig.suptitle(title_name, y=0.75)
+        if i == 1:
+            ax.set_title(title_name)
 
     save_or_show(full_save_path)
 
 
 def view_distributions(image_volumes: Array[float, ('T','...')], bandwidth: float,
-                       full_save_path: str = None):
+                       mask_volume: Array[bool, ('...')] = None, title_name: str = None, 
+                       combine=False, full_save_path: str = None):
     image_volumes = np.asarray(image_volumes)
+
+    if len(image_volumes.shape) == 3:
+        image_volumes = np.expand_dims(image_volumes, 0)
+
+    elif len(image_volumes.shape) < 3:
+        raise ValueError(f"Input 'image_volume' should have at least 3 axes")
+
+    image_volumes = image_volumes[...,mask_volume]
+
     xmin = image_volumes.min()
     xmax = image_volumes.max()
 
-    x = np.linspace(xmin, xmax, 200)
+    x = np.linspace(xmin, xmax, 250)
+
+    if combine:
+        image_volumes = image_volumes.flatten()[None]
 
     for image in image_volumes:
-        img_kde = gaussian_kde(image.flatten(), bandwidth)
+        img_kde = gaussian_kde(image, bandwidth)
         plt.plot(x, img_kde(x))
+
+    plt.title(title_name)
 
     save_or_show(full_save_path)
 

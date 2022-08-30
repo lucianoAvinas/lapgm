@@ -69,7 +69,7 @@ class LapGM:
                 used when running k-means initializer.
             n_classes: Number of classes for the LapGM model.
             kmeans_n_init: Number of times to run k-means with different centroid seeds.
-            kmeans_max_iter: Maximum number of iterations for a given k-means run.
+            kmeans_max_iters: Maximum number of iterations for a given k-means run.
         """
         self.tau = tau
         self.init_settings = dict(log_initialize=log_initialize, kmeans_settings=dict(

@@ -8,14 +8,19 @@ Package **lapgm** can be installed using pip:
 ```
 pip install lapgm
 ```
-A CUDA accelerated version of **biasgen** is also available:
+A CUDA accelerated version of **lapgm** is also available:
 ```
 pip install lapgm[gpu]
 ```
 
 # Examples
 
-An overview on how to debias and normalize with **lapgm** is provided in the 'examples' subdirectory. The example uses three different bias presets of the *BrainWeb* phanatom dataset.
+An overview on how to debias and normalize with **lapgm** is provided in the 'examples' subdirectory. Three presets from the *BrainWeb* normal dataset are used. Some of the debiasing and normalization results are shown below.
+
+<p align="center">
+  <img width="400" src="https://github.com/lucianoAvinas/biasgen/raw/main/images/biased_data.png">
+  <img width="400" src="https://github.com/lucianoAvinas/biasgen/raw/main/images/normalized_data.png">
+</p>
 
 # Usage
 

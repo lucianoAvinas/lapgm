@@ -33,6 +33,7 @@ def save_or_show(save_path: str):
         plt.show()
     else:
         plt.savefig(save_path, bbox_inches='tight', dpi=SAVE_DPI)
+        plt.close()
         plt.clf()
 
 

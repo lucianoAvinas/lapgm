@@ -31,7 +31,7 @@ import lapgm
 # Set compute to GPU
 lapgm.use_gpu(True)
 
-# Set compute to back CPU
+# Set compute back to CPU
 lapgm.use_gpu(False)
 ```
 
@@ -53,7 +53,7 @@ debias_obj.specify_cylindrical_decay(alpha=alpha)
 
 Debiasing can be run as:
 ```python
-# before running disambiguate channeled data from spatial data with 'to_sequence array'
+# before running, disambiguate channeled data from spatial data with 'to_sequence array'
 im_arr = lapgm.to_sequence_array([im_seq1, im_seq2])
 
 # retrive estimated parameters
@@ -62,8 +62,15 @@ params = debias_obj.estimate_parameters(im_arr)
 # get debiased result
 db_arr = lapgm.debias(im_arr, params)
 ```
+T2 example debiasing:
+<p align="center">
+  <img width="300" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/t2_biased.png">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img width="300" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/t2_debiased.png">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</p>
 
-Similarly normalization can be run using the same debiased sequence data and estimated parameters of above:
+Normalization can be run using the same debiased sequence data and estimated parameters from above:
 ```python
 # specify a target intensity to achieve
 TRGT = 1000.

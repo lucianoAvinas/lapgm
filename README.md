@@ -15,14 +15,28 @@ pip install lapgm[gpu]
 
 # Examples
 
-An overview on how to debias and normalize with **lapgm** is provided in the 'examples' subdirectory. Three presets from the [*BrainWeb*](https://brainweb.bic.mni.mcgill.ca/) normal dataset are used. Some of the debiasing and normalization results are shown below.
+An example overview on how to debias and normalize with **lapgm** is provided 'image_correction.ipynb' in the 'examples' subdirectory. For data, three biased presets from the [*BrainWeb*](https://brainweb.bic.mni.mcgill.ca/) normal dataset were used. Some of the debiased and normalized results are provided below.
 
+T2 debiasing results:
 <p align="center">
-  <img width="400" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/biased_data.png">
-  <img width="400" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/normalized_data.png">
+  <img width="300" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/t2_biased.png">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img width="300" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/t2_debiased.png">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</p>
+
+
+T1 normalization results:
+<p align="center">
+  <img width="350" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/biased_data.png">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img width="350" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/normalized_data.png">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </p>
 
 # Usage
+
+Below we list some common commands and procedures to help with the debiasing and normalization of MR images.
 
 **lapgm**'s GPU compute can be turned on and off globally with the 'use_gpu' command. Returned values will be loaded off of the GPU.
 ```python
@@ -62,13 +76,6 @@ params = debias_obj.estimate_parameters(im_arr)
 # get debiased result
 db_arr = lapgm.debias(im_arr, params)
 ```
-T2 example debiasing:
-<p align="center">
-  <img width="300" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/t2_biased.png">
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img width="300" src="https://github.com/lucianoAvinas/lapgm/raw/main/images/t2_debiased.png">
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</p>
 
 Normalization can be run using the same debiased sequence data and estimated parameters from above:
 ```python

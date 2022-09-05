@@ -1,6 +1,6 @@
 # lapgm
 
-**lapgm** is an image correction software package primarily used for MR debiasing and normalization. This package is generalized to work with any number of spatial dimensions and assumes image corruption is smooth, multiplicative, and invariant through image channels. Derivations and results for the spatially regularized Gaussian mixture can be found at [*LapGM: A Multisequence MR Bias Correction and Normalization Model.*](https://arxiv.org)
+**lapgm** is an image correction software package primarily used for MR debiasing and normalization. This package is generalized to work with any number of spatial dimensions and assumes smooth, multiplicative image corruption which is invariant through image channels. Derivations and results for the spatially regularized Gaussian mixture can be found at [*LapGM: A Multisequence MR Bias Correction and Normalization Model.*](https://arxiv.org)
 
 # Installation
 
@@ -15,7 +15,7 @@ pip install lapgm[gpu]
 
 # Examples
 
-An example overview on how to debias and normalize with **lapgm** is provided 'image_correction.ipynb' in the 'examples' subdirectory. For data, three biased presets from the [*BrainWeb*](https://brainweb.bic.mni.mcgill.ca/) normal dataset were used. Some of the debiased and normalized results are provided below.
+An example overview on how to debias and normalize with **lapgm** is provided 'image_correction.ipynb' in the 'examples' subdirectory. For data, three biased presets from the [*BrainWeb*](https://brainweb.bic.mni.mcgill.ca/) normal dataset were used. Some of the debiased and normalized results have been provided below.
 
 T2 debiasing results:
 <p align="center">

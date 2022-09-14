@@ -31,7 +31,7 @@ class LapGM:
     """
     def __init__(self, downscale_factor: int = 1, scaling_order: int = 3, 
                  store_history: bool = False, unstore_large: bool = True):
-        if downscale_factor < 1:
+        if not float(downscale_factor).is_integer() or downscale_factor < 1:
             raise ValueError('Downscale factor should be a whole number.')
 
         self.downscale_factor = downscale_factor

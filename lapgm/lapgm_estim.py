@@ -140,8 +140,7 @@ class LapGM:
         L = weight_laplacian(construct_dirichlet_lap(spat_ds_shape, True), wgts) / self.tau
 
         # calculate parameter estimates
-        params = compute_bias_field(log_image, L, params, bias_tol, max_em_iters, 
-                                    random_seed, print_tols)
+        params = compute_bias_field(log_image, L, params, bias_tol, max_em_iters, print_tols)
         
         # define upscaler and apply
         upscaler = lambda img_ds, targ_shp, sc_lst: scale_and_pad(img_ds, targ_shp, sc_lst, 

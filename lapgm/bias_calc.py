@@ -27,14 +27,16 @@ def compute_bias_field(I_log: Array[float, ('M', 'N')], L: Array[float, ('N', 'N
 
     Returns final parameter estimate with parameter history.
     """
-    step_fns = [e_step, gauss_step, bias_step]
-
-    func_inds = [0,1,0,2]
-
     t = 0
     while params.Bdiff > bias_tol and t < max_iters:
-        for ind in func_inds:
-            step_fns[ind](I_log, L, params)
+        # E-step
+        e_step(I_log, L, params)
+        
+        # M-step (partial): Gaussian params
+        gauss_step(I_log, L, params)
+
+        # M-step (partial): Bias param
+        bias_step(I_log, L, params)
 
         if print_tols:
             print(f'iter: {t}, Bdiff: {params.Bdiff}')

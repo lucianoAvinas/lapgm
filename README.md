@@ -90,4 +90,4 @@ norm_arr = lapgm.normalize(db_arr, params, TRGT)
 1. L. Vinas, A. A. Amini, J. Fischer, and A. Sudhyadhom. LapGM: A Multisequence MR Bias Correction
 and Normalization Model. arXiv.org:2209.13619 [physics.med-ph], Sept. 2022.
 
-2. C.A. Cocosco, V. Kollokian, R.K.-S. Kwan, A.C. Evans. “BrainWeb: Online Interface to a 3D MRI Simulated Brain Database”. In: NeuroImage 5 (1997), p. 425.
+2. C.A. Cocosco, V. Kollokian, R.K.-S. Kwan, A.C. Evans. BrainWeb: Online Interface to a 3D MRI Simulated Brain Database. In: NeuroImage 5 (1997), p. 425.

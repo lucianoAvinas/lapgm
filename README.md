@@ -1,6 +1,6 @@
 # lapgm
 
-**lapgm** is an image correction software package primarily used for MR debiasing and normalization. This package is generalized to work with any number of spatial dimensions and assumes smooth, multiplicative image corruption which is invariant through image channels. Derivations and results for the spatially regularized Gaussian mixture can be found at [*LapGM: A Multisequence MR Bias Correction and Normalization Model.*](https://arxiv.org)
+**lapgm** is an image correction software package primarily used for MR debiasing and normalization. This package is generalized to work with any number of spatial dimensions and assumes smooth, multiplicative image corruption which is invariant through image channels. Derivations and results for the spatially regularized Gaussian mixture can be found at [*LapGM: A Multisequence MR Bias Correction and Normalization Model.*](https://arxiv.org/abs/2209.13619)
 
 # Installation
 
@@ -70,7 +70,7 @@ Debiasing can be run as:
 # before running, disambiguate channeled data from spatial data with 'to_sequence array'
 im_arr = lapgm.to_sequence_array([im_seq1, im_seq2])
 
-# retrive estimated parameters
+# retrieve estimated parameters
 params = debias_obj.estimate_parameters(im_arr)
 
 # get debiased result
@@ -87,4 +87,7 @@ norm_arr = lapgm.normalize(db_arr, params, TRGT)
 ```
 
 # References
-1. Chris A. Cocosco et al. “BrainWeb: Online Interface to a 3D MRI Simulated Brain Database”. In: NeuroImage 5 (1997), p. 425.
+1. L. Vinas, A. A. Amini, J. Fischer, and A. Sudhyadhom. LapGM: A Multisequence MR Bias Correction
+and Normalization Model. arXiv.org:2209.13619 [physics.med-ph], Sept. 2022.
+
+2. C.A. Cocosco, V. Kollokian, R.K.-S. Kwan, A.C. Evans. “BrainWeb: Online Interface to a 3D MRI Simulated Brain Database”. In: NeuroImage 5 (1997), p. 425.

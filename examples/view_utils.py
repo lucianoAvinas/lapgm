@@ -63,6 +63,7 @@ def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Ar
         axes_slices.append(imgs_mask_sl)
 
     fig = plt.figure()
+    fig.patch.set_alpha(0.0)
     subfigs = fig.subfigures(nrows=T, ncols=1)
     title_names = fill_list(title_names, T)
 
@@ -71,6 +72,7 @@ def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Ar
         subfigs = [subfigs]
 
     for i, subfg in enumerate(subfigs):
+        subfg.patch.set_alpha(0.0)
         axs = subfg.subplots(nrows=1, ncols=3)
         for j, ax in enumerate(axs):
             img_slice = axes_slices[j][i]
@@ -78,7 +80,7 @@ def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Ar
             ax.axis('off')
 
             if j == 1:
-                ax.set_title(title_names[i])
+                ax.set_title(title_names[i], color='0.6')
 
     save_or_show(full_save_path)
 
@@ -95,9 +97,11 @@ def view_class_map(w_vol: Array[float, ('K','...')], order: Array[int, 'K'] = No
 
     d = len(spat_shp)
     fig = plt.figure()
+    fig.patch.set_alpha(0.0)
 
     # Subfigure routine centers the image triplet
     subfig = fig.subfigures(nrows=1, ncols=1)
+    subfig.patch.set_alpha(0.0)
     axs = subfig.subplots(nrows=1, ncols=d)
 
     for i in range(d):
@@ -106,7 +110,7 @@ def view_class_map(w_vol: Array[float, ('K','...')], order: Array[int, 'K'] = No
         ax.axis('off')
 
         if i == 1:
-            ax.set_title(title_name)
+            ax.set_title(title_name, color='0.6')
 
     save_or_show(full_save_path)
 
@@ -129,6 +133,9 @@ def view_distributions(image_volumes: Array[float, ('T','...')], bandwidth: floa
 
     x = np.linspace(xmin, xmax, 250)
 
+    fig = plt.figure()
+    fig.patch.set_alpha(0.0)
+
     if combine:
         image_volumes = image_volumes.flatten()[None]
 
@@ -136,7 +143,7 @@ def view_distributions(image_volumes: Array[float, ('T','...')], bandwidth: floa
         img_kde = gaussian_kde(image, bandwidth)
         plt.plot(x, img_kde(x))
 
-    plt.title(title_name)
+    plt.title(title_name, color='0.6')
 
     save_or_show(full_save_path)
 

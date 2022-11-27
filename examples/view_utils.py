@@ -80,7 +80,7 @@ def view_center_slices(image_volumes: Array[float, ('T','...')], mask_volume: Ar
             ax.axis('off')
 
             if j == 1:
-                ax.set_title(title_names[i], color='0.6')
+                ax.set_title(title_names[i])
 
     save_or_show(full_save_path)
 
@@ -110,7 +110,7 @@ def view_class_map(w_vol: Array[float, ('K','...')], order: Array[int, 'K'] = No
         ax.axis('off')
 
         if i == 1:
-            ax.set_title(title_name, color='0.6')
+            ax.set_title(title_name)
 
     save_or_show(full_save_path)
 
@@ -143,7 +143,7 @@ def view_distributions(image_volumes: Array[float, ('T','...')], bandwidth: floa
         img_kde = gaussian_kde(image, bandwidth)
         plt.plot(x, img_kde(x))
 
-    plt.title(title_name, color='0.6')
+    plt.title(title_name)
 
     save_or_show(full_save_path)
 

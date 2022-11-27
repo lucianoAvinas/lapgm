@@ -135,9 +135,13 @@ class ParameterEstimate:
         # number of spatial dimensions
         dims = len(self.spat_shape_in)
 
-        # allows for image upscaling on arrays with prepended information
-        upscale_wrapper = lambda dat, pre_dim: upscaler(dat, pre_dim + list(orig_spat), 
-                                               [1]*len(pre_dim) + [scale_fctr]*dims)
+        if scale_fctr > 1:
+            # allows for image upscaling on arrays with prepended information
+            upscale_wrapper = lambda dat, pre_dim: upscaler(dat, pre_dim + list(orig_spat), 
+                                                   [1]*len(pre_dim) + [scale_fctr]*dims)
+        else:
+            # identity fn for scale_fctr = 1
+            upscale_wrapper = lambda dat, pre_dim: dat
 
         # reshape and scale parameters that have image dimensions
         self.B = self.B.reshape(self.spat_shape_in)
